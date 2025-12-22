@@ -15,6 +15,7 @@ This separation is intentional and foundational.
 ---
 
 ## High-Level System Diagram
+```
 ┌──────────────────────────────┐
 │           Frontend           │
 │   React + TypeScript Editor  │
@@ -41,6 +42,7 @@ This separation is intentional and foundational.
 │      Object Storage          │
 │  (PDFs, images, HTML, zips)  │
 └──────────────────────────────┘
+```
 ---
 
 ## Core Architectural Principles
