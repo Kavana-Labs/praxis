@@ -37,7 +37,7 @@ This separation is intentional and foundational.
 │  Code • Simulations • Plots  │
 │  Exports • Rendering         │
 └───────────────┬──────────────┘
-│ store artifacts
+                │ store artifacts
 ┌───────────────▼──────────────┐
 │      Object Storage          │
 │  (PDFs, images, HTML, zips)  │
