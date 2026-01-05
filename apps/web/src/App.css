@@ -2,4 +2,14 @@ body {
     font-family: "Plus Jakarta Sans", sans-serif;
     font-optical-sizing: auto;
     font-style: normal;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
   }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
