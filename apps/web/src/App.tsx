@@ -1,10 +1,15 @@
-import './App.css';
-import Landing from './pages/landing/landing'
+import "./App.css";
+import { RouterProvider } from "react-router-dom";
+import { AuthProvider } from "@/auth/auth-context";
+import { router } from "@/router/router";
+import RouteLoading from "@/router/route-loading";
 
 function App() {
-    return (
-        <Landing />
-    )
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} fallbackElement={<RouteLoading />} />
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;
