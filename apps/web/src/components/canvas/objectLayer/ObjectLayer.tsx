@@ -40,31 +40,32 @@ export function ObjectLayer({
     if (!draggable) return;
 
     objectEls.current.forEach((el, id) => {
-      interact(el).draggable({
-        listeners: {
-          move(event) {
-            console.log("moving");
-            const scale = canvasRef.current?.getCamera().scale ?? 1;
-            const dxWorld = event.dx / scale;
-            const dyWorld = event.dy / scale;
+      interact(el)
+        .draggable({
+          listeners: {
+            move(event) {
+              const scale = canvasRef.current?.getCamera().scale ?? 1;
+              const dxWorld = event.dx / scale;
+              const dyWorld = event.dy / scale;
 
-            onObjectsChange((prev) =>
-              prev.map((o) =>
-                o.id === id
-                  ? {
-                      ...o,
-                      rect: {
-                        ...o.rect,
-                        x: o.rect.x + dxWorld,
-                        y: o.rect.y + dyWorld,
-                      },
-                    }
-                  : o,
-              ),
-            );
+              onObjectsChange((prev) =>
+                prev.map((o) =>
+                  o.id === id
+                    ? {
+                        ...o,
+                        rect: {
+                          ...o.rect,
+                          x: o.rect.x + dxWorld,
+                          y: o.rect.y + dyWorld,
+                        },
+                      }
+                    : o,
+                ),
+              );
+            },
           },
-        },
-      });
+        })
+        .styleCursor(false);
     });
 
     return () => {
@@ -85,7 +86,17 @@ export function ObjectLayer({
             obj={obj}
             selected={selectedSet.has(obj.id)}
             onPointerDown={(e) => {
-              onSelect([obj.id]);
+              //   e.stopPropagation();
+              const isToggle = e.shiftKey;
+              if (!isToggle) {
+                onSelect([obj.id]);
+                return;
+              }
+
+              const next = new Set(selectedIds);
+              if (next.has(obj.id)) next.delete(obj.id);
+              else next.add(obj.id);
+              onSelect([...next]);
             }}
           />
         );

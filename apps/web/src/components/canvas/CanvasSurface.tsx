@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { useGesture } from "@use-gesture/react";
+import { Cursor, type CursorVariant } from "./CustomCursor";
 
 export type Point = { x: number; y: number };
 export type Camera = { x: number; y: number; scale: number };
@@ -51,11 +52,20 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
     const [cam, setCam] = useState<Camera>(initialCamera);
     const camRef = useRef(cam);
 
-    const didPanRef = useRef(false);
     const isSpaceDownRef = useRef(false);
 
     const [isPanning, setIsPanning] = useState(false);
     const [isSpaceDown, setIsSpaceDown] = useState(false);
+    const [isClicked, setIsClicked] = useState(false);
+
+    const cursorVariant: CursorVariant =
+      isSpaceDown && isClicked
+        ? "grabClick"
+        : isSpaceDown
+          ? isPanning
+            ? "grabbing"
+            : "grab"
+          : "default";
 
     const isTypingTarget = (t: EventTarget | null) => {
       const el = t as HTMLElement | null;
@@ -91,12 +101,19 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
         }
       };
 
+      const onMouseDown = (_: MouseEvent) => setIsClicked(true);
+      const onMouseUp = (_: MouseEvent) => setIsClicked(false);
+
       window.addEventListener("keydown", onKeyDown, { passive: true });
       window.addEventListener("keyup", onKeyUp);
+      window.addEventListener("mousedown", onMouseDown);
+      window.addEventListener("mouseup", onMouseUp);
 
       return () => {
         window.removeEventListener("keydown", onKeyDown as any);
         window.removeEventListener("keyup", onKeyUp as any);
+        window.removeEventListener("mousedown", onMouseDown as any);
+        window.removeEventListener("mouseup", onMouseUp as any);
       };
     }, []);
 
@@ -200,6 +217,10 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
           overflow: "hidden",
           background,
           touchAction: "none",
+          cursor: "none",
+          backgroundImage:
+            "radial-gradient(rgba(0,0,0,0.08) 1px, transparent 1px)",
+          backgroundSize: "12px 12px",
         }}
       >
         {/* HUD */}
@@ -219,6 +240,14 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
           Zoom: {zoomPct}%
         </div>
 
+        <Cursor
+          containerRef={
+            viewportRef as unknown as React.RefObject<HTMLElement | null>
+          }
+          variant={cursorVariant}
+          enabled
+        />
+
         {/* Pan layer */}
         <div
           ref={panLayerRef}
@@ -226,7 +255,6 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
             position: "absolute",
             inset: 0,
             zIndex: 1,
-            cursor: isSpaceDown ? (isPanning ? "grabbing": "grab") : "default",
             touchAction: "none",
           }}
         />
