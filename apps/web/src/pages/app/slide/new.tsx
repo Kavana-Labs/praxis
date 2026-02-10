@@ -1,8 +1,11 @@
 import { useRef, useState } from "react";
-import { CanvasSurface, type CanvasHandle } from "@/components/canvas/CanvasSurface";
+import {
+  CanvasSurface,
+  type CanvasHandle,
+} from "@/components/canvas/CanvasSurface";
 import { ObjectLayer } from "@/components/canvas/objectLayer/ObjectLayer";
 import type { CanvasObject } from "@/components/canvas/objectLayer/types";
-
+import { SelectionLayer } from "@/components/canvas/SelectionLayer";
 
 const NewSlide = () => {
   return (
@@ -24,28 +27,30 @@ export function CanvasWithObjects() {
   const [objects, setObjects] = useState<CanvasObject[]>([
     { id: "A", type: "Box", rect: { x: 120, y: 120, w: 160, h: 96 } },
     { id: "B", type: "Box", rect: { x: 420, y: 240, w: 160, h: 96 } },
+    { id: "C", type: "Box", rect: { x: 720, y: 240, w: 160, h: 96 } },
   ]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const tapBackground = () => {
     setSelectedIds([]);
-  }
+  };
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
-      <CanvasSurface onBackgroundTap={tapBackground} ref={canvasRef}>
-        {/* Optional: world grid */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: "radial-gradient(rgba(0,0,0,0.08) 1px, transparent 1px)",
-            backgroundSize: "12px 12px",
-            pointerEvents: "none",
-          }}
-        />
-
+      <CanvasSurface
+        overlay={
+          <SelectionLayer
+            canvasRef={canvasRef}
+            objects={objects}
+            selectedIds={selectedIds}
+            onSelect={setSelectedIds}
+            enabled
+          />
+        }
+        onBackgroundTap={tapBackground}
+        ref={canvasRef}
+      >
         <ObjectLayer
           canvasRef={canvasRef}
           objects={objects}

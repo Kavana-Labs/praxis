@@ -13,7 +13,7 @@ export type Point = { x: number; y: number };
 export type Camera = { x: number; y: number; scale: number };
 
 export type CanvasHandle = {
-  getViewportRect: () => DOMRect | null;
+  getViewportElement: () => HTMLDivElement | null;
   getCamera: () => Camera;
   setCamera: (next: Camera | ((prev: Camera) => Camera)) => void;
   screenToWorld: (p: Point) => Point;
@@ -23,14 +23,21 @@ export type CanvasHandle = {
     nextScale: number,
   ) => void;
   resetView: () => void;
+  isSpaceDown: () => boolean;
 };
 
 export type CanvasSurfaceProps = {
   initialCamera?: Camera;
   background?: string;
+
+  /** World-space content (objects live here; affected by camera transform) */
   children?: React.ReactNode;
 
-  onBackgroundTap: () => void;
+  /** Screen-space overlay (selection marquee, guides, etc.) */
+  overlay?: React.ReactNode;
+
+  /** Background tap/click (only fires when NOT space-to-pan) */
+  onBackgroundTap?: () => void;
 };
 
 const clamp = (v: number, min: number, max: number) =>
@@ -42,6 +49,7 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
       initialCamera = { x: 0, y: 0, scale: 1 },
       background = "#f2f2f2",
       children,
+      overlay,
       onBackgroundTap,
     },
     ref,
@@ -49,23 +57,30 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const panLayerRef = useRef<HTMLDivElement | null>(null);
 
-    const [cam, setCam] = useState<Camera>(initialCamera);
+    const [cam, setCamState] = useState<Camera>(initialCamera);
     const camRef = useRef(cam);
 
-    const isSpaceDownRef = useRef(false);
+    const setCamera = (next: Camera | ((prev: Camera) => Camera)) => {
+      setCamState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        camRef.current = value;
+        return value;
+      });
+    };
 
-    const [isPanning, setIsPanning] = useState(false);
+    // Space-to-pan state
+    const isSpaceDownRef = useRef(false);
     const [isSpaceDown, setIsSpaceDown] = useState(false);
+    const [isPanning, setIsPanning] = useState(false);
+
+    // Mouse down state (helps cursor feel more responsive)
     const [isClicked, setIsClicked] = useState(false);
 
-    const cursorVariant: CursorVariant =
-      isSpaceDown && isClicked
-        ? "grabClick"
-        : isSpaceDown
-          ? isPanning
-            ? "grabbing"
-            : "grab"
-          : "default";
+    const cursorVariant: CursorVariant = isSpaceDown
+      ? isPanning || isClicked
+        ? "grabbing"
+        : "grab"
+      : "default";
 
     const isTypingTarget = (t: EventTarget | null) => {
       const el = t as HTMLElement | null;
@@ -84,6 +99,7 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
         if (e.code !== "Space") return;
         if (isTypingTarget(e.target)) return;
 
+        // Prevent page scroll on Space
         e.preventDefault();
 
         if (!isSpaceDownRef.current) {
@@ -98,28 +114,35 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
         if (isSpaceDownRef.current) {
           isSpaceDownRef.current = false;
           setIsSpaceDown(false);
+          setIsPanning(false);
         }
       };
 
-      const onMouseDown = (_: MouseEvent) => setIsClicked(true);
-      const onMouseUp = (_: MouseEvent) => setIsClicked(false);
+      const onMouseDown = () => setIsClicked(true);
+      const onMouseUp = () => setIsClicked(false);
+      const onBlur = () => {
+        isSpaceDownRef.current = false;
+        setIsSpaceDown(false);
+        setIsPanning(false);
+        setIsClicked(false);
+      };
 
-      window.addEventListener("keydown", onKeyDown, { passive: true });
+      // passive: false is REQUIRED because we call preventDefault in onKeyDown
+      const keydownOptions = { passive: false } as const;
+      window.addEventListener("keydown", onKeyDown, keydownOptions);
       window.addEventListener("keyup", onKeyUp);
       window.addEventListener("mousedown", onMouseDown);
       window.addEventListener("mouseup", onMouseUp);
+      window.addEventListener("blur", onBlur);
 
       return () => {
-        window.removeEventListener("keydown", onKeyDown as any);
+        window.removeEventListener("keydown", onKeyDown as any, keydownOptions);
         window.removeEventListener("keyup", onKeyUp as any);
         window.removeEventListener("mousedown", onMouseDown as any);
         window.removeEventListener("mouseup", onMouseUp as any);
+        window.removeEventListener("blur", onBlur as any);
       };
     }, []);
-
-    useEffect(() => {
-      camRef.current = cam;
-    }, [cam]);
 
     const getViewportRect = () =>
       viewportRef.current?.getBoundingClientRect() ?? null;
@@ -150,14 +173,14 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
       const wx = (sx - c.x) / c.scale;
       const wy = (sy - c.y) / c.scale;
 
-      setCam({
+      setCamera({
         x: sx - nextScale * wx,
         y: sy - nextScale * wy,
         scale: nextScale,
       });
     };
 
-    // Pan on empty-space layer only
+    // Space-to-pan on background layer
     useGesture(
       {
         onDragStart: () => {
@@ -171,13 +194,17 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
             return;
           }
           const [dx, dy] = delta;
-          setCam((c) => ({ ...c, x: c.x + dx, y: c.y + dy }));
+          setCamera((c) => ({ ...c, x: c.x + dx, y: c.y + dy }));
         },
+
         onDragEnd: () => {
           setIsPanning(false);
         },
+
         onClick: () => {
-          onBackgroundTap();
+          // Only clear selection when NOT in space-pan mode
+          if (isSpaceDownRef.current) return;
+          onBackgroundTap?.();
         },
       },
       { target: panLayerRef, drag: { filterTaps: true, threshold: 2 } },
@@ -196,13 +223,14 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
     );
 
     useImperativeHandle(ref, () => ({
-      getViewportRect,
+      getViewportElement: () => viewportRef.current,
       getCamera: () => camRef.current,
-      setCamera: setCam,
+      setCamera,
       screenToWorld,
       worldToScreen,
       zoomAt,
-      resetView: () => setCam({ x: 0, y: 0, scale: 1 }),
+      resetView: () => setCamera({ x: 0, y: 0, scale: 1 }),
+      isSpaceDown: () => isSpaceDownRef.current,
     }));
 
     const zoomPct = useMemo(() => Math.round(cam.scale * 100), [cam.scale]);
@@ -217,7 +245,7 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
           overflow: "hidden",
           background,
           touchAction: "none",
-          cursor: "none",
+
           backgroundImage:
             "radial-gradient(rgba(0,0,0,0.08) 1px, transparent 1px)",
           backgroundSize: "12px 12px",
@@ -225,6 +253,7 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
       >
         {/* HUD */}
         <div
+          data-canvas-ui
           style={{
             position: "absolute",
             top: 12,
@@ -239,7 +268,6 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
         >
           Zoom: {zoomPct}%
         </div>
-
         <Cursor
           containerRef={
             viewportRef as unknown as React.RefObject<HTMLElement | null>
@@ -248,7 +276,7 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
           enabled
         />
 
-        {/* Pan layer */}
+        {/* Pan layer (captures background gestures) */}
         <div
           ref={panLayerRef}
           style={{
@@ -256,10 +284,11 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
             inset: 0,
             zIndex: 1,
             touchAction: "none",
+            background: "transparent",
           }}
         />
 
-        {/* World */}
+        {/* World (camera-transformed) */}
         <div
           style={{
             pointerEvents: "none",
@@ -270,7 +299,20 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
             transformOrigin: "0 0",
           }}
         >
+          {/* children can still receive events */}
           <div style={{ pointerEvents: "auto" }}>{children}</div>
+        </div>
+
+        {/* Screen-space overlay (selection, guides, etc.) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 5000,
+            pointerEvents: "none",
+          }}
+        >
+          {overlay}
         </div>
       </div>
     );

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MousePointer2, Hand, HandGrab } from "lucide-react";
-
-import pointerDefault from "@/assets/default-cursor.svg";
+import { MousePointer2, Hand, HandGrab, Crosshair } from "lucide-react";
 
 export type CursorVariant =
   | "default"
@@ -28,7 +26,10 @@ export function Cursor({ containerRef, variant, enabled = true }: CursorProps) {
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || !enabled) {
+      setInside(false);
+      return;
+    }
 
     const onMove = (e: PointerEvent) => {
       const rect = el.getBoundingClientRect();
@@ -44,15 +45,18 @@ export function Cursor({ containerRef, variant, enabled = true }: CursorProps) {
     };
 
     const onLeave = () => setInside(false);
+    const onEnter = (e: PointerEvent) => onMove(e);
 
     el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerenter", onEnter);
     el.addEventListener("pointerleave", onLeave);
 
     return () => {
       el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerenter", onEnter);
       el.removeEventListener("pointerleave", onLeave);
     };
-  }, [containerRef]);
+  }, [containerRef, enabled]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -100,23 +104,24 @@ function CursorGlyph({
         position: "absolute",
         left: x,
         top: y,
-        transform: "translate(2px, 2px)",
+        transform: "translate(-3px, -3px)",
         color: "rgba(20, 20, 20, 0.9)",
       }}
     >
-      {variant === "default" ? (
-        // <MousePointer2
-        //   enableBackground={"#000"}
-        //   size={20}
-        //   strokeWidth={1.5}
-        // ></MousePointer2>
-        <img src={pointerDefault} />
+      {variant === "default" || variant === "pointer" ? (
+        <MousePointer2
+          enableBackground={"#000"}
+          size={20}
+          strokeWidth={1.5}
+        />
       ) : variant === "grab" || variant === "grabbing" ? (
         <Hand size={20} strokeWidth={1.5} />
       ) : variant === "grabClick" ? (
         <HandGrab size={20} strokeWidth={1.5} />
+      ) : variant === "crosshair" ? (
+        <Crosshair size={20} strokeWidth={1.5} />
       ) : (
-        <></>
+        null
       )}
     </div>
   );

@@ -35,11 +35,11 @@ export function ObjectLayer({
   );
 
   useEffect(() => {
-    interact(".praxis-object").unset();
-
     if (!draggable) return;
 
-    objectEls.current.forEach((el, id) => {
+    const entries = Array.from(objectEls.current.entries());
+
+    entries.forEach(([id, el]) => {
       interact(el)
         .draggable({
           listeners: {
@@ -69,9 +69,11 @@ export function ObjectLayer({
     });
 
     return () => {
-      interact(".praxis-object").unset();
+      entries.forEach(([, el]) => {
+        interact(el).unset();
+      });
     };
-  }, [canvasRef, draggable, onObjectsChange, objectIdsKey, objects.length]);
+  }, [canvasRef, draggable, onObjectsChange, objectIdsKey]);
 
   return (
     <>
@@ -86,7 +88,7 @@ export function ObjectLayer({
             obj={obj}
             selected={selectedSet.has(obj.id)}
             onPointerDown={(e) => {
-              //   e.stopPropagation();
+              if (e.button !== 0) return;
               const isToggle = e.shiftKey;
               if (!isToggle) {
                 onSelect([obj.id]);

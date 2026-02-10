@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import type React from "react";
 import type { CanvasObject } from "./types";
 
 type ObjectNodeProps = {
@@ -28,12 +29,12 @@ export const ObjectNode = forwardRef<HTMLDivElement, ObjectNodeProps>(
           borderRadius: 10,
           boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
           userSelect: "none",
-          cursor: "none",
+          cursor: "move",
           overflow: "hidden",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "system-ui, -apple-system, Segeo UI, Roboto, sans-serif",
+          fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
           fontWeight: 600,
           color: "#222",
         }}
@@ -43,3 +44,5 @@ export const ObjectNode = forwardRef<HTMLDivElement, ObjectNodeProps>(
     );
   },
 );
+
+ObjectNode.displayName = "ObjectNode";

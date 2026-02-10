@@ -242,7 +242,7 @@ const Canvas: FC<CanvasConfig> = ({width, height, bg = "#fff"}) => {
                 "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
               fontWeight: 600,
               color: "#222",
-              cursor: "move",
+              cursor: "none",
               pointerEvents: "auto",
               zIndex: 3,
             }}
