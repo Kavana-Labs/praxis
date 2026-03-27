@@ -25,6 +25,10 @@ export const router = createBrowserRouter([
         lazy: () => import("@/pages/auth/route"),
       },
       {
+        path: toRoutePath(ROUTES.register),
+        lazy: () => import("@/pages/auth/register-route"),
+      },
+      {
         path: toRoutePath(ROUTES.app),
         element: <AuthGuard />,
         children: [

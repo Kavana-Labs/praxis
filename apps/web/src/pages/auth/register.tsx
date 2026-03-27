@@ -6,25 +6,52 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/auth-context";
 import mathBackground from "@/assets/math_background.png";
 
-const Login: React.FC = () => {
+const Register: React.FC = () => {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { setUser } = useAuth();
   const navigate = useNavigate();
 
   const validate = () => {
-    const newErrors: { email?: string; password?: string } = {};
+    const newErrors: {
+      name?: string;
+      email?: string;
+      password?: string;
+      confirmPassword?: string;
+    } = {};
+    
+    if (!name.trim()) {
+      newErrors.name = "Name is required";
+    }
+    
     if (!email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = "Please enter a valid email address";
     }
+    
     if (!password) {
       newErrors.password = "Password is required";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
     }
+    
+    if (!confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+    
     setErrors(newErrors);
     setSubmitError(null);
     return Object.keys(newErrors).length === 0;
@@ -38,31 +65,31 @@ const Login: React.FC = () => {
 
     try {
       // TODO: Replace with real API call
-      // For now, simulate authentication
+      // For now, simulate registration
       await new Promise((resolve) => setTimeout(resolve, 800));
       
-      // Mock successful login
+      // Mock successful registration
       setUser({
         id: "user-123",
-        name: email.split("@")[0],
+        name: name.trim(),
       });
       
       navigate("/app");
     } catch (error) {
-      setSubmitError("Invalid email or password. Please try again.");
+      setSubmitError("Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     // TODO: Implement Google OAuth
     // eslint-disable-next-line no-console
     console.log("Google OAuth - to be implemented");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f6f7fb] via-[#f3efff] to-[#ede7fa] relative px-2 overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f6f7fb] via-[#f3efff] to-[#ede7fa] relative px-2 overflow-hidden py-8">
       <div
         className="absolute inset-0 opacity-[0.25] pointer-events-none select-none bg-cover bg-center"
         style={{ backgroundImage: `url(${mathBackground})` }}
@@ -70,7 +97,7 @@ const Login: React.FC = () => {
       <main className="relative z-10 w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 flex flex-col items-center">
         <div className="flex flex-col items-center mb-6">
           <ShadcnLogoIcon style={{ width: 48, height: 40 }} />
-          <h1 className="mt-4 text-2xl font-bold text-slate-900">Welcome Back</h1>
+          <h1 className="mt-4 text-2xl font-bold text-slate-900">Create a Free Account</h1>
           <p className="mt-2 text-slate-600 text-center text-base max-w-xs">
             Create scientific presentations with native LaTeX, simulations, and research-grade tools.
           </p>
@@ -78,9 +105,9 @@ const Login: React.FC = () => {
         <form className="w-full" onSubmit={handleSubmit} noValidate>
           <button
             type="button"
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleSignup}
             className="w-full mb-4 h-11 px-4 bg-white border border-slate-200 text-slate-700 rounded-lg font-medium text-base flex items-center justify-center gap-3 hover:bg-slate-50 hover:border-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2"
-            aria-label="Continue with Google"
+            aria-label="Sign up with Google"
           >
             <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -100,7 +127,7 @@ const Login: React.FC = () => {
                 fill="#EA4335"
               />
             </svg>
-            Continue with Google
+            Sign up with Google
           </button>
           <div className="flex items-center my-4">
             <div className="flex-grow h-px bg-slate-200" />
@@ -112,6 +139,17 @@ const Login: React.FC = () => {
               {submitError}
             </div>
           )}
+          <Input
+            label="Name"
+            name="name"
+            type="text"
+            autoComplete="name"
+            placeholder="John Doe"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            error={errors.name}
+            required
+          />
           <Input
             label="Email"
             name="email"
@@ -127,40 +165,52 @@ const Login: React.FC = () => {
             label="Password"
             name="password"
             type="password"
-            autoComplete="current-password"
-            placeholder="********"
+            autoComplete="new-password"
+            placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             error={errors.password}
             required
           />
-          <div className="flex justify-end items-center mb-4">
-            <Link
-              to="/auth/forgot-password"
-              className="text-sm text-primary hover:text-primary/90 hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded font-medium"
-            >
-              Forgot Password?
-            </Link>
-          </div>
+          <Input
+            label="Confirm Password"
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            error={errors.confirmPassword}
+            required
+          />
           <Button type="submit" fullWidth disabled={loading} className="mb-2">
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Creating account..." : "Create Account"}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm text-slate-600">
-          Don't have an Account?{' '}
+          Already have an Account?{' '}
           <Link
-            to="/auth/register"
+            to="/auth/login"
             className="text-primary hover:text-primary/90 hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded font-medium"
           >
-            Register
+            Login
           </Link>
         </div>
         <div className="mt-6 text-xs text-slate-400 text-center whitespace-nowrap">
           LaTeX-native • Academic-ready exports • Built for scientists & engineers
+        </div>
+        <div className="mt-4 text-xs text-slate-400 text-center">
+          By creating an account, you agree to our{' '}
+          <Link
+            to="/terms"
+            className="text-primary hover:text-primary/90 hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded font-medium"
+          >
+            Terms of Use
+          </Link>
         </div>
       </main>
     </div>
   );
 };
 
-export default Login;
+export default Register;
