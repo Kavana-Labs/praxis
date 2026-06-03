@@ -11,3 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 .venv
 *.pyc
+# IDE / tooling
+.idea/
+.claude/
+__pycache__/
