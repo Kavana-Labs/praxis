@@ -140,6 +140,9 @@ Artifacts must be:
 - Content-addressed (digest required)
 - Stored outside the worker filesystem
 - Described via metadata, not raw paths
+````
+
+
 
 ### 7.2 Upload Flow
 1. Adapter produces artifact in sandbox

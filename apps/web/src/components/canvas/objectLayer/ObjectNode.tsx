@@ -29,7 +29,6 @@ export const ObjectNode = forwardRef<HTMLDivElement, ObjectNodeProps>(
           borderRadius: 10,
           boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
           userSelect: "none",
-          cursor: "move",
           overflow: "hidden",
           display: "flex",
           alignItems: "center",
