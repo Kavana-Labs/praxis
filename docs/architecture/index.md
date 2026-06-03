@@ -255,3 +255,74 @@ Every architectural decision must preserve:
 * separation of concerns
 * future canvas freedom
 
+---
+
+## 13. MVP Implementation (this repository)
+
+The sections above describe the long-term architecture. This section maps the **implemented
+MVP** onto it.
+
+> **The MVP uses slide-bounded authoring surfaces, while the long-term Praxis canvas is
+> continuous and spatial. The same object-centric document model should support both
+> projections.**
+
+### 13.1 Object-centric domain model
+
+The document is normalized: scientific objects live in `document.objects` keyed by id; slides
+hold only `objectIds`. Assets and citations are normalized too. Coordinates are stored in a
+stable **logical slide space** (`1600 × 900`), never in browser pixels. The model is defined
+once as a Zod schema (`apps/web/src/domain/schema.ts`), and the TypeScript types are inferred
+from it — the validator and the types cannot drift.
+
+### 13.2 MVP Slide Mode vs. the future continuous canvas
+
+The MVP editor is a bounded 16:9 surface (`components/canvas/SlideStage` + `SlideCanvas`) with
+selection, drag, and resize — and **no** global pan/zoom. Slides are a *projection*: they
+reference objects and impose placement, but they do not own data. Because the model is
+object-centric, a future continuous canvas is an additional projection over the same object
+graph, not a rewrite.
+
+### 13.3 Separation: UI model vs. technical model
+
+- **Technical model** — the document (objects, slides, assets, citations) is the source of truth
+  and is independent of React.
+- **UI/local state** — selection, the active slide, the inline-editing target, and save status
+  live in the editor store but are *not* part of the document and are *not* serialized.
+
+### 13.4 Compiler-style rendering flow
+
+```
+Author → Structured Model → Normalize → Project → Render → Present
+```
+
+- **Author** — the editor view forwards intent to the command layer.
+- **Structured Model** — the normalized document.
+- **Normalize** — `domain/normalize.ts` repairs references, bounds, and z-index.
+- **Project** — `domain/projection.ts` produces a read-only presentation view model.
+- **Render** — a single object **renderer registry** (`components/objects/registry`) renders
+  objects for the editor, Present Mode, and thumbnails, differing only by `mode`.
+- **Present** — `components/presentation` renders from the projection, never from editor DOM.
+
+### 13.5 Command layer
+
+All edits flow through pure command functions (`domain/commands.ts`) wrapped by the Zustand
+store (`stores/editor-store.ts`), which adds undo/redo (document snapshots), collapses drag/edit
+gestures into single history steps, and keeps execution results out of the undo history (they
+are derived outputs). UI components never mutate the document directly.
+
+### 13.6 Persistence abstraction
+
+Persistence is behind a `PersistenceAdapter` interface
+(`services/persistence/adapter.ts`). The MVP ships a localStorage implementation with debounced
+autosave; a remote API adapter can replace it by changing one line. Documents export as
+deterministic JSON and import through a validating, normalizing, migration-aware pipeline.
+
+### 13.7 Execution-service boundary
+
+The web app **never executes user code**. The Run action calls a typed client
+(`services/execution/client.ts`) which posts to the separate FastAPI execution service. The
+service runs untrusted Python in an isolated sandbox and returns structured results + artifacts.
+Every execution is traceable to a code object via its `executionId`, and generated artifacts can
+be inserted onto a slide as `ArtifactObject`s. See `architecture/executor.md` and
+`document-format.md`.
+

@@ -10,5 +10,12 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     }
-  }
+  },
+  // react-rnd's dependency (react-draggable) references `process.env.NODE_ENV`,
+  // which the browser does not define. Replace it at build time.
+  define: {
+    "process.env.NODE_ENV": JSON.stringify(
+      process.env.NODE_ENV ?? "development",
+    ),
+  },
 })
