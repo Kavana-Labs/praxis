@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, FC } from "react";
+import { useEffect, useMemo, useRef, useState, type FC } from "react";
 import { useGesture } from "@use-gesture/react";
 import interact from "interactjs";
 

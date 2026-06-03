@@ -1,16 +1,14 @@
-FROM node:20-alpine 
-
-WORKDIR /app 
-
+# Build the Praxis web editor and serve the static bundle.
+FROM node:20-alpine AS build
+WORKDIR /app
 COPY package*.json ./
-RUN npm install 
+RUN npm install
+COPY . .
+RUN npm run build
 
-COPY . . 
-
-RUN npm run build 
-
-RUN npm install -g serve 
-
-EXPOSE 5173 
-
-CMD [ "server", "-s", "dist", "-l", "5173" ]
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=build /app/dist ./dist
+EXPOSE 5173
+CMD ["serve", "-s", "dist", "-l", "5173"]
