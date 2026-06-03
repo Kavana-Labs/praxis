@@ -27,6 +27,7 @@
     "dompurify": "^3.4.7",
     "framer-motion": "^12.24.0",
     "immer": "^11.1.8",
+    "interactjs": "^1.10.27",
     "katex": "^0.17.0",
     "lucide-react": "^0.562.0",
     "nanoid": "^5.1.11",
