@@ -1,11 +1,8 @@
-from fastapi import FastAPI 
-from app.health import router as health_router 
+"""Convenience entrypoint so `uvicorn main:app` also works.
 
+The canonical app lives in `app.main`; prefer `uvicorn app.main:app`.
+"""
 
-app = FastAPI(
-    title="Praxis Execution Service",
-    version="0.1.0"
-)
+from app.main import app
 
-
-app.include_router(health_router)
+__all__ = ["app"]
