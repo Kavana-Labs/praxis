@@ -186,6 +186,9 @@ export function SelectionLayer({
 
         marqueeIdsRef.current.forEach((id) => base.add(id));
         onSelect([...base]);
+      } else if (!shiftDownRef.current && selectedIdsRef.current.length > 0) {
+        // Plain click on empty canvas clears current selection.
+        onSelect([]);
       }
 
       resetDrag(e.pointerId);
@@ -221,7 +224,24 @@ export function SelectionLayer({
     onSelect([...base]);
   }, [dragging, marqueeIds, onSelect]);
 
-  if (!enabled || !dragging || !screenRect) return null;
+  // if (selectedIds.length > 1) {
+  //   console.log("objects:", objects);
+  //   return (
+  //     <div
+  //       style={{
+  //         position: "absolute",
+  //         left: 200,
+  //         top: 100,
+  //         width: 300,
+  //         height: 300,
+  //         border: "1px solid red",
+  //         background: "rgba(79, 70, 229, 0.12)",
+  //       }}
+  //     />
+  //   );
+  // }
+
+  if (!enabled || !dragging || !screenRect || selectedIds.length < 1) return null;
 
   return (
     <div

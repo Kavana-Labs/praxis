@@ -136,7 +136,7 @@ export const CanvasSurface = forwardRef<CanvasHandle, CanvasSurfaceProps>(
       window.addEventListener("blur", onBlur);
 
       return () => {
-        window.removeEventListener("keydown", onKeyDown as any, keydownOptions);
+        window.removeEventListener("keydown", onKeyDown as any);
         window.removeEventListener("keyup", onKeyUp as any);
         window.removeEventListener("mousedown", onMouseDown as any);
         window.removeEventListener("mouseup", onMouseUp as any);
