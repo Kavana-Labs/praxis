@@ -1,29 +1,72 @@
-
+import { useState } from "react";
 import Logo, { LogoText } from "@/components/Logo.tsx";
 
-const Header = () => {
-    return <header className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-700">
-        <nav className="bg-white border-gray-200 dark:bg-gray-800">
-            <div className="flex flex-wrap justify-between items-center px-8 py-5 mx-auto">
-                <a href={"/"}><Logo className="inline-block" /> <LogoText className="inline-block" /></a>
-                <div className="flex items-center lg:order-2">
-                    <a href={"#"} className="text-gray-800 dark:text-white hover:bg-gray-50 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-3 py-2.5 text-center mr-2 md:mr-2 transition-colors duration-200">Login</a>
-                    <a href={"#"} className="text-white bg-[linear-gradient(90deg,#5B16E1_0%,#805DF7_100%)] hover:bg-primary/80 focus:ring-4 focus:outline-none focus:ring-primary rounded-lg text-sm px-5 py-2.5 text-center transition-transform duration-200 ease-out active:scale-[0.98]">Sign up</a>
-                    <button data-collapse-toggle="mobile-menu-2" type="button" className="inline-flex items-center p-2 ml-1 text-sm text-gray-500 rounded-lg lg:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600 transition-colors duration-200" aria-controls="mobile-menu-2" aria-expanded="false">  
-                        <span className="sr-only">Open main menu</span>
-                        <svg className="w-6 h-6" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"></path></svg>
-                    </button>
-                </div>
-                <div className="hidden justify-between items-center w-full lg:flex lg:w-auto lg:order-1" id="mobile-menu-2">
-                    <ul className="flex flex-col mt-4 font-medium lg:flex-row lg:space-x-8 lg:mt-0"> 
-                        <li><a className="block py-2 pl-3 pr-4 text-gray-500 rounded hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:p-0 dark:text-white md:dark:hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent transition-colors duration-200" href={"#templates"}>Templates</a></li>
-                        <li><a className="block py-2 pl-3 pr-4 text-gray-500 rounded hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:p-0 dark:text-white md:dark:hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent transition-colors duration-200" href={"#pricing"}>Pricing</a></li>
-                        <li><a className="block py-2 pl-3 pr-4 text-gray-500 rounded hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:p-0 dark:text-white md:dark:hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent transition-colors duration-200" href={"#faqs"}>FAQ</a></li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-}
+const NAV_LINKS = [
+  { label: "Templates", href: "#templates" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faqs" },
+];
 
-export default Header
+const Header = () => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <header className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-700">
+      <nav className="border-gray-200 bg-white">
+        <div className="mx-auto flex flex-wrap items-center justify-between px-4 py-4 sm:px-8 sm:py-5">
+          <a href="/" className="flex items-center">
+            <Logo className="inline-block" /> <LogoText className="ml-1 inline-block" />
+          </a>
+
+          <div className="flex items-center lg:order-2">
+            <a
+              href="#"
+              className="mr-1 rounded-lg px-3 py-2.5 text-center text-sm font-medium text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-blue-300 sm:mr-2"
+            >
+              Login
+            </a>
+            <a
+              href="/editor"
+              className="rounded-lg bg-[linear-gradient(90deg,#5B16E1_0%,#805DF7_100%)] px-4 py-2.5 text-center text-sm text-white transition-transform duration-200 ease-out hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-primary active:scale-[0.98] sm:px-5"
+            >
+              Sign up
+            </a>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-controls="mobile-menu"
+              aria-expanded={open}
+              className="ml-1 inline-flex items-center rounded-lg p-2 text-sm text-gray-500 transition-colors duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 lg:hidden"
+            >
+              <span className="sr-only">Toggle main menu</span>
+              <svg className="h-6 w-6" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            className={`${open ? "block" : "hidden"} w-full lg:order-1 lg:flex lg:w-auto`}
+            id="mobile-menu"
+          >
+            <ul className="mt-4 flex flex-col font-medium lg:mt-0 lg:flex-row lg:space-x-8">
+              {NAV_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a
+                    className="block rounded py-2 pl-3 pr-4 text-gray-500 transition-colors duration-200 hover:bg-gray-100 lg:p-0 lg:hover:bg-transparent lg:hover:text-[#652FF3]"
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </nav>
+    </header>
+  );
+};
+
+export default Header;
