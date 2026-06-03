@@ -141,6 +141,17 @@ Type-check the frontend: `cd apps/web && npm run typecheck`.
 
 ---
 
+## Deployment
+
+The editor (`apps/web`) deploys to Vercel via a GitHub Action
+(`.github/workflows/deploy-vercel.yml`) — preview on branch pushes, production on
+`master`/`main`, gated on type-check + unit tests. See
+[`docs/deployment.md`](docs/deployment.md) for the one-time Vercel project + secrets
+setup. (Vercel hosts the static editor; the Docker execution sandbox runs
+separately.)
+
+---
+
 ## Known MVP limitations
 
 - Single local document focus; no accounts, collaboration, or cloud sync.

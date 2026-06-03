@@ -1,0 +1,82 @@
+name: Deploy Web to Vercel
+
+# Deploys apps/web to Vercel. Preview deploys on any branch push; production
+# deploys on master/main. Gated on a passing type-check + unit test run.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       — a Vercel access token (Vercel → Account Settings → Tokens)
+#   VERCEL_ORG_ID      — from `vercel link` (.vercel/project.json) or the dashboard
+#   VERCEL_PROJECT_ID  — from `vercel link` (.vercel/project.json) or the dashboard
+#
+# The Vercel project's Root Directory must be set to `apps/web`.
+# See docs/deployment.md.
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Type-check & unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  deploy:
+    name: Deploy to Vercel
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Resolve environment
+        id: env
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/master" ] || [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "target=production" >> "$GITHUB_OUTPUT"
+            echo "prod=--prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=preview" >> "$GITHUB_OUTPUT"
+            echo "prod=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=${{ steps.env.outputs.target }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build ${{ steps.env.outputs.prod }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        run: |
+          URL=$(vercel deploy --prebuilt ${{ steps.env.outputs.prod }} --token=${{ secrets.VERCEL_TOKEN }})
+          echo "Deployed to $URL"
+          {
+            echo "### Vercel ${{ steps.env.outputs.target }} deployment"
+            echo ""
+            echo "$URL"
+          } >> "$GITHUB_STEP_SUMMARY"
