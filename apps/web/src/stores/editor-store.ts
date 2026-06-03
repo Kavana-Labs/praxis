@@ -148,11 +148,16 @@ export const useEditorStore = create<EditorState>((set, get) => {
   /** Apply a history-recording mutation. The pre-mutation doc becomes undoable. */
   const mutate = (recipe: DocRecipe) => {
     const { document, past } = get();
-    const next = produce(document, (draft) => {
+    // Apply the recipe first WITHOUT stamping updatedAt, so a recipe that
+    // changes nothing (e.g. targeting a missing object) is a true no-op and is
+    // detected regardless of the wall clock.
+    const changed = produce(document, (draft) => {
       recipe(draft as PraxisDocument);
+    });
+    if (changed === document) return; // no-op recipe; don't pollute history
+    const next = produce(changed, (draft) => {
       draft.updatedAt = nowIso();
     });
-    if (next === document) return; // no-op recipe; don't pollute history
     set({
       document: next,
       past: [...past, document].slice(-HISTORY_LIMIT),
@@ -411,11 +416,13 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     transformLive: (recipe) => {
       const { document } = get();
-      const next = produce(document, (draft) => {
+      const changed = produce(document, (draft) => {
         recipe(draft as PraxisDocument);
+      });
+      if (changed === document) return; // true no-op
+      const next = produce(changed, (draft) => {
         draft.updatedAt = nowIso();
       });
-      if (next === document) return;
       set({ document: next, _transformDirty: true, saveStatus: "dirty" });
     },
 
