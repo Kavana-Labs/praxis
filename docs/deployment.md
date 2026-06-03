@@ -12,18 +12,20 @@ workflow:
 
 ### 1. Create the Vercel project
 
-Link the repo to a Vercel project with the app's subdirectory as the root:
+Link the repo to a Vercel project:
 
 ```bash
 cd apps/web
 npx vercel link          # choose/create the project
-# In the Vercel dashboard → Project → Settings:
-#   Root Directory    = apps/web
-#   Framework Preset  = Vite           (Build: npm run build, Output: dist)
 ```
 
 `vercel link` writes `apps/web/.vercel/project.json` containing `orgId` and
 `projectId` — you'll need those next. (`.vercel` is git-ignored.)
+
+The workflow runs the Vercel CLI **inside `apps/web`**, so it builds the app in
+isolation (where `vite` is installed). **Leave the Vercel project's Root
+Directory at its default** — do not set it to `apps/web`, or the CLI would look
+for `apps/web/apps/web`. The framework auto-detects as Vite.
 
 ### 2. Add the GitHub Actions secrets
 
