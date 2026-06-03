@@ -27,3 +27,6 @@ playwright-report
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.vercel-secret
+.vercel*

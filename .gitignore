@@ -16,3 +16,4 @@ pnpm-debug.log*
 .claude/
 __pycache__/
 .vercel
+.vercel-secret

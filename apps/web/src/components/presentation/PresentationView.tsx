@@ -27,6 +27,7 @@ export function PresentationView({ onExit }: { onExit: () => void }) {
   const [index, setIndex] = useState(startIndex);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const touch = useRef({ x: 0, swiped: false });
 
   const count = model.slides.length;
   const clampedIndex = Math.min(index, Math.max(0, count - 1));
@@ -106,9 +107,25 @@ export function PresentationView({ onExit }: { onExit: () => void }) {
   return (
     <div
       ref={containerRef}
-      className="group relative h-screen w-screen overflow-hidden bg-slate-950"
+      className="group relative h-screen w-screen touch-pan-y overflow-hidden bg-slate-950"
+      onTouchStart={(e) => {
+        touch.current = { x: e.touches[0].clientX, swiped: false };
+      }}
+      onTouchEnd={(e) => {
+        const dx = e.changedTouches[0].clientX - touch.current.x;
+        if (Math.abs(dx) > 40) {
+          touch.current.swiped = true;
+          if (dx < 0) next();
+          else prev();
+        }
+      }}
       onClick={(e) => {
-        // Click the right two-thirds to advance, left third to go back.
+        // A swipe already navigated — don't also treat it as a tap.
+        if (touch.current.swiped) {
+          touch.current.swiped = false;
+          return;
+        }
+        // Tap the right two-thirds to advance, left third to go back.
         const x = e.clientX / window.innerWidth;
         if (x < 0.33) prev();
         else next();
@@ -118,9 +135,9 @@ export function PresentationView({ onExit }: { onExit: () => void }) {
         <PresentationSlideView slide={slide} document={document} theme={model.theme} />
       </div>
 
-      {/* Controls — appear on hover, stay out of the way otherwise. */}
+      {/* Controls — always visible on touch; fade in on hover on desktop. */}
       <div
-        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-slate-900/80 px-2 py-1 text-slate-200 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"
+        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-slate-900/80 px-2 py-1 text-slate-200 opacity-100 backdrop-blur transition-opacity lg:opacity-0 lg:group-hover:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <button
