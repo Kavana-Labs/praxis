@@ -10,7 +10,7 @@ const ProductShowcase = () => {
             aria-hidden="true"
             decoding="async"
         />
-        <div className="mt-[-220px]">
+        <div className="-mt-[60px] sm:-mt-[120px] lg:-mt-[220px]">
             <img
                 className="-z-[9] w-full motion-safe:animate-in motion-safe:fade-in motion-safe:duration-1000 pointer-events-none"
                 src={appShowcase2}
