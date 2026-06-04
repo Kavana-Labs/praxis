@@ -24,21 +24,21 @@ type TagProps = {
 
 
 const Tag: React.FC<TagProps> = ({ color, name }) => {
-    return <span style={{ borderColor: color, color: color }} className={`border border-dashed border-1 border-[${color}] rounded-[16px] py-[8px] px-[12px] text-[${color}]`}>{name}</span>
+    return <span style={{ borderColor: color, color: color }} className="rounded-[16px] border border-dashed px-[12px] py-[8px] text-sm">{name}</span>
 }
 
 const FeatureCard: React.FC<FeatureProps> = ({ categoryIcon, tag, title, text, imageUrl, bgMask, colSpan }) => {
 
     return (
-        <div className={`${colSpan == true ? 'col-span-2 w-full' : 'max-w-[380px]'} border relative max-h-[457px] rounded-[24px] border border-1 border-[#202023] bg-[#0A0A0A52] p-[32px] text-left flex flex-col mb-[32px] shadow-[inset_0_-34px_64px_0_rgba(255,255,255,0.16)]`}>
-            {bgMask && <img className="absolute top-0 right-[-50px]" src={bgMask} alt="" />}
-            <div className="flex justify-between items-start mb-[24px]">
+        <div className={`${colSpan ? 'w-full lg:col-span-2' : 'w-full max-w-[380px]'} relative flex flex-col overflow-hidden rounded-[24px] border border-1 border-[#202023] bg-[#0A0A0A52] p-6 text-left shadow-[inset_0_-34px_64px_0_rgba(255,255,255,0.16)] sm:p-[32px]`}>
+            {bgMask && <img className="pointer-events-none absolute right-[-50px] top-0" src={bgMask} alt="" />}
+            <div className="mb-[24px] flex items-start justify-between">
                 {categoryIcon}
                 {tag}
             </div>
-            <p className="text-[22px] font-[500] mb-[16px]">{title}</p>
-            <p className="text-[16px] font-[300] text-[#D1D5DB] mb-[32px]">{text}</p>
-            <img className="w-full max-h-[192px] object-contain" src={imageUrl} alt="" />
+            <p className="mb-[16px] text-[20px] font-[500] sm:text-[22px]">{title}</p>
+            <p className="mb-[32px] text-[16px] font-[300] text-[#D1D5DB]">{text}</p>
+            <img className="mt-auto max-h-[192px] w-full object-contain" src={imageUrl} alt="" />
         </div>
     );
 }
@@ -86,17 +86,17 @@ const featureListB: Array<FeatureProps> = [
 
 const FeaturesSection = () => {
     return (
-        <div className="max-w-[1320px] mx-auto bg-[#060606] pt-[150px] text-center text-white mt-[118px] rounded-[48px]">
-            <p className="text-[48px] font-bold text-white mb-[32px]">Everything You Need for<br /> <span className="text-[#C4BCFB]">Scientific Presentations</span></p>
-            <p className="text-[18px] font-[400] mb-[79px]">Professional-grade tools designed specifically for STEM<br /> education, research, and engineering documentation.</p>
+        <div className="mx-auto mt-16 max-w-[1320px] rounded-[32px] bg-[#060606] px-4 pb-12 pt-20 text-center text-white sm:mt-[118px] sm:rounded-[48px] sm:pt-[150px]">
+            <p className="mb-[32px] text-[30px] font-bold text-white sm:text-[40px] lg:text-[48px]">Everything You Need for<br /> <span className="text-[#C4BCFB]">Scientific Presentations</span></p>
+            <p className="mb-12 text-[16px] font-[400] sm:mb-[79px] sm:text-[18px]">Professional-grade tools designed specifically for STEM education, research, and engineering documentation.</p>
 
 
-            <div className="flex flex-row justify-center gap-[24px]">
-                {featureListA.map(feature => <FeatureCard {...feature} />)}
+            <div className="mb-8 flex flex-col items-center gap-6 lg:flex-row lg:flex-wrap lg:items-stretch lg:justify-center lg:gap-[24px]">
+                {featureListA.map((feature) => <FeatureCard key={feature.title} {...feature} />)}
             </div>
 
-            <div className="grid grid-cols-[repeat(3,minmax(0,380px))] gap-6 mx-auto w-fit">
-                {featureListB.map((feature) => <FeatureCard {...feature} />)}
+            <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
+                {featureListB.map((feature) => <FeatureCard key={feature.title} {...feature} />)}
             </div>
         </div>
     )
