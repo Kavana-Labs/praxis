@@ -25,7 +25,7 @@ export const router = createBrowserRouter([
         lazy: () => import("@/pages/present/route"),
       },
       {
-        path: toRoutePath(ROUTES.login),
+        path: "auth/*",
         lazy: () => import("@/pages/auth/route"),
       },
       {
