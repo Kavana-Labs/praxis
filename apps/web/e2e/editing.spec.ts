@@ -71,8 +71,9 @@ test("text editing: typing and Backspace never move or delete the object", async
   const id = await insertText(page);
   const object = page.locator(`[data-object-id="${id}"]`);
 
-  // Enter editing mode with a double-click.
+  // Enter editing mode with a double-click; wait for the editor to own focus.
   await object.dblclick();
+  await expect(page.locator(".praxis-richtext-editor")).toBeFocused();
   let snap = await snapshot(page, id);
   expect(snap.editing).toBe(id);
 

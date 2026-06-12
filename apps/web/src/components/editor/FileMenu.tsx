@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, FilePlus2, FlaskConical } from "lucide-react";
+import { ChevronDown, FilePlus2, FlaskConical, MonitorUp } from "lucide-react";
 import { createHarmonicMotionDeck } from "@/seed/harmonic-motion";
 import { useEditorStore } from "@/stores/editor-store";
+import { useUiStore } from "@/stores/ui-store";
 
 /**
  * Minimal File menu: create a new presentation or load the seeded example.
@@ -61,6 +62,17 @@ export function FileMenu() {
             }}
           >
             <FilePlus2 size={15} /> New presentation
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              useUiStore.getState().openImportModal();
+              setOpen(false);
+            }}
+          >
+            <MonitorUp size={15} /> Import presentation…
           </button>
           <button
             type="button"

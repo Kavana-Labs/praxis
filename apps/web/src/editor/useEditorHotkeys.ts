@@ -84,7 +84,9 @@ export function useEditorHotkeys(enabled = true): void {
         return;
       }
 
-      if (typing) return;
+      // Inline editing owns the keyboard even before its editor grabs focus
+      // (the brief gap after double-click) — object-level shortcuts stay inert.
+      if (typing || editing) return;
 
       const selected = store.selectedObjectIds;
 
