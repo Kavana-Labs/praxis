@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "@/domain/constants";
 import { fitScale } from "@/domain/geometry";
@@ -10,7 +11,8 @@ import { useElementSize } from "./useElementSize";
  * The slide is a fixed logical 1600x900 space. This component measures its
  * container, computes a single scale factor, and renders a pixel-perfect frame
  * containing a `scale()`-transformed logical stage. Children render in logical
- * units and receive the scale (needed by react-rnd to map pointer deltas).
+ * units and receive the scale (the interaction layer uses it to map pointer
+ * deltas into logical units).
  *
  * This same component backs the editor canvas, Present Mode, and thumbnails —
  * there is exactly one place where logical-to-pixel scaling happens.
@@ -23,6 +25,8 @@ export type SlideStageProps = {
   padding?: number;
   /** Fired when the empty slide surface is pressed (used to clear selection). */
   onBackgroundPointerDown?: (e: PointerEvent<HTMLDivElement>) => void;
+  /** Reports the current logical→pixel scale whenever the viewport changes. */
+  onScaleChange?: (scale: number) => void;
   frameStyle?: CSSProperties;
   interactive?: boolean;
 };
@@ -33,6 +37,7 @@ export function SlideStage({
   children,
   padding = 0,
   onBackgroundPointerDown,
+  onScaleChange,
   frameStyle,
   interactive = true,
 }: SlideStageProps) {
@@ -45,6 +50,10 @@ export function SlideStage({
   const scale = fitScale(available.width, available.height);
   const frameWidth = SLIDE_WIDTH * scale;
   const frameHeight = SLIDE_HEIGHT * scale;
+
+  useEffect(() => {
+    onScaleChange?.(scale);
+  }, [scale, onScaleChange]);
 
   const slideBg =
     background?.type === "color" && background.color

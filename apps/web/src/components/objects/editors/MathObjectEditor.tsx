@@ -1,13 +1,15 @@
-import { useEffect, useRef } from "react";
-import { Check, Sigma } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { Check, CircleAlert, Sigma } from "lucide-react";
 import type { MathObject } from "@/domain/types";
 import { Katex } from "@/lib/katex";
+import { latexParseError } from "@/lib/latex";
 import { useEditorStore } from "@/stores/editor-store";
 
 /**
- * Inline LaTeX editor card (Platform Figma `1-1817`): a live KaTeX preview, a
- * LaTeX textarea, and a "Σ Equations" footer with a Done button. The whole
- * editing session is one undo step.
+ * Inline LaTeX editor card: a live KaTeX preview, a LaTeX source area, and a
+ * footer with parse feedback + Done. The whole editing session is one undo
+ * step. Malformed LaTeX shows a calm, specific message — the editor never
+ * crashes, and the source is always preserved verbatim.
  */
 export function MathObjectEditor({ object }: { object: MathObject }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -15,6 +17,8 @@ export function MathObjectEditor({ object }: { object: MathObject }) {
   const endTransform = useEditorStore((s) => s.endTransform);
   const updateObjectLive = useEditorStore((s) => s.updateObjectLive);
   const setEditingObject = useEditorStore((s) => s.setEditingObject);
+
+  const parseError = useMemo(() => latexParseError(object.latex), [object.latex]);
 
   useEffect(() => {
     beginTransform();
@@ -57,6 +61,7 @@ export function MathObjectEditor({ object }: { object: MathObject }) {
         ref={ref}
         value={object.latex}
         spellCheck={false}
+        aria-label="LaTeX source"
         placeholder="\frac{\partial}{\partial t}\Psi"
         onChange={(e) => updateObjectLive(object.id, { latex: e.target.value })}
         style={{
@@ -83,10 +88,43 @@ export function MathObjectEditor({ object }: { object: MathObject }) {
           background: "#f9fafb",
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#6b7280", fontSize: 12 }}>
-          <Sigma size={14} />
-          Equations
-        </span>
+        {parseError ? (
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              minWidth: 0,
+              color: "#b45309",
+              fontSize: 12,
+            }}
+            title={parseError}
+          >
+            <CircleAlert size={14} style={{ flexShrink: 0 }} />
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {parseError}
+            </span>
+          </span>
+        ) : (
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              color: "#6b7280",
+              fontSize: 12,
+            }}
+          >
+            <Sigma size={14} />
+            LaTeX
+          </span>
+        )}
         <button
           type="button"
           onClick={() => setEditingObject(null)}
@@ -95,6 +133,7 @@ export function MathObjectEditor({ object }: { object: MathObject }) {
             display: "flex",
             alignItems: "center",
             gap: 6,
+            flexShrink: 0,
             background: "#652ff3",
             color: "#fff",
             border: "none",

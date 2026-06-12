@@ -1,6 +1,6 @@
 import { current, isDraft } from "immer";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "./constants";
-import { clampBounds } from "./geometry";
+import { clampBounds, minSizeForType, moveBounds } from "./geometry";
 import { ID } from "./ids";
 import type {
   Bounds,
@@ -102,7 +102,16 @@ export function cmdDuplicateSlide(
     const obj = doc.objects[objectId];
     if (!obj) continue;
     const cloneId = ID.object();
-    doc.objects[cloneId] = { ...plainClone(obj), id: cloneId };
+    const clone: PraxisObject = { ...plainClone(obj), id: cloneId };
+    if (clone.type === "citation") {
+      const record = doc.citations[clone.citationId];
+      if (record) {
+        const recordId = ID.citation();
+        doc.citations[recordId] = { ...plainClone(record), id: recordId };
+        clone.citationId = recordId;
+      }
+    }
+    doc.objects[cloneId] = clone;
     newObjectIds.push(cloneId);
   }
 
@@ -175,8 +184,17 @@ export function cmdUpdateObject(
   const { id: _id, type: _type, ...safe } = patch;
   void _id;
   void _type;
-  Object.assign(obj, safe);
-  obj.updatedAt = new Date().toISOString();
+  // Only stamp updatedAt when a field actually changes value; otherwise a
+  // same-value patch would register as a change and pollute undo history.
+  const record = obj as unknown as Record<string, unknown>;
+  let changed = false;
+  for (const [key, value] of Object.entries(safe)) {
+    if (!Object.is(record[key], value)) {
+      record[key] = value;
+      changed = true;
+    }
+  }
+  if (changed) obj.updatedAt = new Date().toISOString();
 }
 
 export function cmdSetObjectBounds(
@@ -186,7 +204,15 @@ export function cmdSetObjectBounds(
 ): void {
   const obj = doc.objects[objectId];
   if (!obj) return;
-  const clamped = clampBounds(bounds);
+  const clamped = clampBounds(bounds, minSizeForType(obj.type));
+  if (
+    obj.x === clamped.x &&
+    obj.y === clamped.y &&
+    obj.width === clamped.width &&
+    obj.height === clamped.height
+  ) {
+    return; // no-op move/resize — keep history clean
+  }
   obj.x = clamped.x;
   obj.y = clamped.y;
   obj.width = clamped.width;
@@ -234,6 +260,26 @@ export function cmdAlignObject(
   cmdSetObjectBounds(doc, objectId, { x, y, width: obj.width, height: obj.height });
 }
 
+/** Move an object to an absolute position; position-only (size untouched). */
+export function cmdMoveObjectTo(
+  doc: PraxisDocument,
+  objectId: string,
+  x: number,
+  y: number,
+): void {
+  const obj = doc.objects[objectId];
+  if (!obj) return;
+  const moved = moveBounds(
+    { x, y, width: obj.width, height: obj.height },
+    0,
+    0,
+  );
+  if (obj.x === moved.x && obj.y === moved.y) return; // no-op
+  obj.x = moved.x;
+  obj.y = moved.y;
+  obj.updatedAt = new Date().toISOString();
+}
+
 export function cmdMoveObjectBy(
   doc: PraxisDocument,
   objectId: string,
@@ -242,12 +288,7 @@ export function cmdMoveObjectBy(
 ): void {
   const obj = doc.objects[objectId];
   if (!obj) return;
-  cmdSetObjectBounds(doc, objectId, {
-    x: obj.x + dx,
-    y: obj.y + dy,
-    width: obj.width,
-    height: obj.height,
-  });
+  cmdMoveObjectTo(doc, objectId, obj.x + dx, obj.y + dy);
 }
 
 export function cmdDeleteObjects(doc: PraxisDocument, objectIds: string[]): void {
@@ -272,22 +313,131 @@ export function cmdDuplicateObject(
   if (!source || !slide) return null;
   const cloneId = ID.object();
   const offset = 24;
-  const clamped = clampBounds({
-    x: source.x + offset,
-    y: source.y + offset,
-    width: source.width,
-    height: source.height,
-  });
-  doc.objects[cloneId] = {
+  const moved = moveBounds(
+    {
+      x: source.x + offset,
+      y: source.y + offset,
+      width: source.width,
+      height: source.height,
+    },
+    0,
+    0,
+  );
+  const clone: PraxisObject = {
     ...plainClone(source),
     id: cloneId,
-    x: clamped.x,
-    y: clamped.y,
+    x: moved.x,
+    y: moved.y,
   };
+  // A duplicated citation gets its own record so editing one copy never
+  // silently rewrites the other.
+  if (clone.type === "citation") {
+    const record = doc.citations[clone.citationId];
+    if (record) {
+      const recordId = ID.citation();
+      doc.citations[recordId] = { ...plainClone(record), id: recordId };
+      clone.citationId = recordId;
+    }
+  }
+  doc.objects[cloneId] = clone;
   const sourceIndex = slide.objectIds.indexOf(objectId);
   slide.objectIds.splice(sourceIndex + 1, 0, cloneId);
   reindexSlide(doc, slide.id);
   return cloneId;
+}
+
+/**
+ * Self-contained clipboard payload: the copied objects plus the citation
+ * records and assets they reference, so a paste works even after the source
+ * objects (or their slide) are gone.
+ */
+export type ClipboardPayload = {
+  objects: PraxisObject[];
+  citations: Record<string, CitationRecord>;
+  assets: Record<string, PraxisAsset>;
+};
+
+/** Snapshot the given objects (plus referenced records) into a clipboard payload. */
+export function buildClipboardPayload(
+  doc: PraxisDocument,
+  objectIds: string[],
+): ClipboardPayload | null {
+  const objects = objectIds
+    .map((id) => doc.objects[id])
+    .filter((o): o is PraxisObject => Boolean(o))
+    .map((o) => plainClone(o));
+  if (objects.length === 0) return null;
+
+  const citations: Record<string, CitationRecord> = {};
+  const assets: Record<string, PraxisAsset> = {};
+  for (const obj of objects) {
+    if (obj.type === "citation" && doc.citations[obj.citationId]) {
+      citations[obj.citationId] = plainClone(doc.citations[obj.citationId]);
+    }
+    if ((obj.type === "image" || obj.type === "artifact") && obj.assetId) {
+      const asset = doc.assets[obj.assetId];
+      if (asset) assets[obj.assetId] = plainClone(asset);
+    }
+  }
+  return { objects, citations, assets };
+}
+
+/**
+ * Paste a clipboard payload onto a slide, offset by `offset` logical units.
+ * Objects get fresh ids; citation records are re-created per paste so copies
+ * never share a record. Returns the new object ids (paint order preserved).
+ */
+export function cmdPasteObjects(
+  doc: PraxisDocument,
+  slideId: string,
+  payload: ClipboardPayload,
+  offset: number,
+): string[] {
+  const slide = doc.slides.find((s) => s.id === slideId);
+  if (!slide) return [];
+
+  const newIds: string[] = [];
+  for (const source of payload.objects) {
+    const cloneId = ID.object();
+    const moved = moveBounds(
+      {
+        x: source.x + offset,
+        y: source.y + offset,
+        width: source.width,
+        height: source.height,
+      },
+      0,
+      0,
+    );
+    const clone: PraxisObject = {
+      ...plainClone(source),
+      id: cloneId,
+      x: moved.x,
+      y: moved.y,
+    };
+
+    if (clone.type === "citation") {
+      const record =
+        payload.citations[clone.citationId] ?? doc.citations[clone.citationId];
+      if (record) {
+        const recordId = ID.citation();
+        doc.citations[recordId] = { ...plainClone(record), id: recordId };
+        clone.citationId = recordId;
+      }
+    }
+    if ((clone.type === "image" || clone.type === "artifact") && clone.assetId) {
+      const asset = payload.assets[clone.assetId];
+      if (asset && !doc.assets[clone.assetId]) {
+        doc.assets[asset.id] = plainClone(asset);
+      }
+    }
+
+    doc.objects[cloneId] = clone;
+    slide.objectIds.push(cloneId);
+    newIds.push(cloneId);
+  }
+  reindexSlide(doc, slideId);
+  return newIds;
 }
 
 export type ZOrderOp = "forward" | "backward" | "front" | "back";

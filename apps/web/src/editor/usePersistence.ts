@@ -44,6 +44,28 @@ export function useEditorBootstrap(): void {
 }
 
 /**
+ * Persist the current document immediately (used by autosave and Cmd/Ctrl+S).
+ * Safe to call at any time: a save already in flight is not duplicated, and
+ * the status only flips to "saved" if nothing changed during the write.
+ */
+export async function saveNow(): Promise<void> {
+  const store = useEditorStore.getState();
+  if (store.saveStatus === "saving") return;
+  store.setSaveStatus("saving");
+  try {
+    await persistence.save(store.document);
+    await persistence.setLastOpenedId(store.document.id);
+    if (useEditorStore.getState().document === store.document) {
+      useEditorStore.getState().setSaveStatus("saved");
+    } else {
+      useEditorStore.getState().setSaveStatus("dirty");
+    }
+  } catch {
+    useEditorStore.getState().setSaveStatus("error");
+  }
+}
+
+/**
  * Debounced autosave. Persists the document shortly after edits settle and
  * reflects progress through the save-status badge.
  */
@@ -60,20 +82,9 @@ export function useAutosave(): void {
     }
 
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      const store = useEditorStore.getState();
-      if (store.saveStatus !== "dirty") return;
-      store.setSaveStatus("saving");
-      try {
-        await persistence.save(store.document);
-        await persistence.setLastOpenedId(store.document.id);
-        // Only mark saved if nothing changed during the write.
-        if (useEditorStore.getState().document === store.document) {
-          useEditorStore.getState().setSaveStatus("saved");
-        }
-      } catch {
-        useEditorStore.getState().setSaveStatus("error");
-      }
+    timer.current = setTimeout(() => {
+      if (useEditorStore.getState().saveStatus !== "dirty") return;
+      void saveNow();
     }, AUTOSAVE_DELAY_MS);
 
     return () => {

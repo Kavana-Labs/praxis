@@ -1,13 +1,15 @@
-import { useEffect } from "react";
-import CodeMirror from "@uiw/react-codemirror";
+import { useEffect, useMemo } from "react";
+import CodeMirror, { keymap, Prec } from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import type { CodeObject } from "@/domain/types";
 import { useEditorStore } from "@/stores/editor-store";
+import { useRunCode } from "@/components/execution/useRunCode";
 import { CodeRunControls } from "@/components/execution/CodeRunControls";
 
 /**
- * Inline code editor (CodeMirror 6) — light, macOS-window styled to match the
- * Platform Figma. Edits are coalesced into one undo step. The Run button +
+ * Inline code editor (CodeMirror 6) — light, macOS-window styled. Edits are
+ * coalesced into one undo step; CodeMirror keeps its own in-session history.
+ * Escape exits editing, Cmd/Ctrl+Enter runs the cell. The Run button +
  * execution output sit in the footer.
  */
 const DOTS = ["#ff5f57", "#febc2e", "#28c840"];
@@ -16,11 +18,38 @@ export function CodeObjectEditor({ object }: { object: CodeObject }) {
   const beginTransform = useEditorStore((s) => s.beginTransform);
   const endTransform = useEditorStore((s) => s.endTransform);
   const updateObjectLive = useEditorStore((s) => s.updateObjectLive);
+  const { run } = useRunCode(object);
 
   useEffect(() => {
     beginTransform();
     return () => endTransform();
   }, [beginTransform, endTransform]);
+
+  const extensions = useMemo(
+    () => [
+      python(),
+      // High precedence so these fire before CodeMirror's own bindings.
+      Prec.high(
+        keymap.of([
+          {
+            key: "Escape",
+            run: () => {
+              useEditorStore.getState().setEditingObject(null);
+              return true;
+            },
+          },
+          {
+            key: "Mod-Enter",
+            run: () => {
+              void run();
+              return true;
+            },
+          },
+        ]),
+      ),
+    ],
+    [run],
+  );
 
   const exec = object.execution;
   const filename = object.language === "python" ? "script.py" : object.language;
@@ -62,6 +91,7 @@ export function CodeObjectEditor({ object }: { object: CodeObject }) {
             textAlign: "center",
             fontSize: 13,
             color: "#6b7280",
+            pointerEvents: "none",
           }}
         >
           {filename}
@@ -71,7 +101,8 @@ export function CodeObjectEditor({ object }: { object: CodeObject }) {
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
         <CodeMirror
           value={object.source}
-          extensions={[python()]}
+          autoFocus
+          extensions={extensions}
           basicSetup={{ lineNumbers: true, highlightActiveLine: true, foldGutter: false }}
           onChange={(value) => updateObjectLive(object.id, { source: value })}
           style={{ fontSize: 14 }}
@@ -88,6 +119,9 @@ export function CodeObjectEditor({ object }: { object: CodeObject }) {
         }}
       >
         <CodeRunControls object={object} label="Run code" />
+        <span style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
+          ⌘⏎ run · Esc done
+        </span>
         {exec && (exec.stdout || exec.stderr) ? (
           <pre
             style={{
