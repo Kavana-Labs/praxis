@@ -121,7 +121,7 @@ function Sidebar() {
 }
 
 function AccountMenu() {
-  const { user, isAuthenticated, setUser } = useAuth();
+  const { user, isAuthenticated, service } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -149,35 +149,70 @@ function AccountMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-600 text-white transition-colors hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-600 text-sm font-semibold text-white transition-colors hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
       >
-        <User size={20} />
+        {user?.displayName ? (
+          user.displayName
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase() ?? "")
+            .join("")
+        ) : (
+          <User size={20} />
+        )}
       </button>
       {open ? (
         <div
           role="menu"
           className="absolute right-0 top-12 z-30 w-60 rounded-lg border border-gray-200 bg-white p-3 shadow-lg animate-in fade-in zoom-in-95 duration-100"
         >
-          <p className="text-sm font-semibold text-gray-800">
-            {isAuthenticated ? (user?.name ?? user?.id) : "Local workspace"}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500">
-            Documents are stored in this browser. Praxis accounts and cloud
-            sync are coming with Praxis Pro.
-          </p>
-          {isAuthenticated ? (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setUser(null);
-                setOpen(false);
-              }}
-              className="mt-3 w-full rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
-            >
-              Sign out
-            </button>
-          ) : null}
+          {isAuthenticated && user ? (
+            <>
+              <p className="truncate text-sm font-semibold text-gray-800">
+                {user.displayName ?? user.email}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-gray-500">{user.email}</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                Documents are stored in this browser; cloud sync is coming with
+                Praxis Pro.
+              </p>
+              <Link
+                to="/app/profile"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="mt-3 block w-full rounded-md border border-gray-200 px-3 py-1.5 text-center text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                Profile settings
+              </Link>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  void service.signOut();
+                  setOpen(false);
+                }}
+                className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-gray-800">Local workspace</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                Documents are stored in this browser. Create an account to get
+                a profile{service.kind === "firebase" ? " and verified email" : ""}.
+              </p>
+              <Link
+                to="/auth/login"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="mt-3 block w-full rounded-md bg-[#652ff3] px-3 py-1.5 text-center text-xs font-semibold text-white transition-colors hover:bg-brand-600"
+              >
+                Sign in
+              </Link>
+            </>
+          )}
         </div>
       ) : null}
     </div>
