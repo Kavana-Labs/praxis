@@ -150,8 +150,9 @@ export function EditorTopBar({
         <PraxisMark size={30} />
       </Link>
       <Link
-        to="/"
-        title="Home"
+        to="/app"
+        title="Dashboard"
+        aria-label="Dashboard"
         className="hidden h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors md:flex"
       >
         <House size={17} />

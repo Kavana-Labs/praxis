@@ -1,6 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "./layout";
-import { AdminGuard, AuthGuard } from "./guards";
+import { AdminGuard } from "./guards";
 import { ROUTES } from "./paths";
 import ErrorPage from "@/pages/errors/error";
 
@@ -29,14 +29,9 @@ export const router = createBrowserRouter([
         lazy: () => import("@/pages/auth/route"),
       },
       {
-        path: toRoutePath(ROUTES.app),
-        element: <AuthGuard />,
-        children: [
-          {
-            index: true,
-            lazy: () => import("@/pages/app/route"),
-          },
-        ],
+        // Local-first dashboard — documents live in this browser, no sign-in.
+        path: `${toRoutePath(ROUTES.app)}/*`,
+        lazy: () => import("@/pages/app/route"),
       },
       {
         path: toRoutePath(ROUTES.admin),
