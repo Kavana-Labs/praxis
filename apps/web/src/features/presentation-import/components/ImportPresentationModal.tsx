@@ -10,9 +10,13 @@ import {
   validatePptxFile,
 } from "../services/importPresentation";
 import {
+  GoogleCancelledError,
   importFromGoogleSlides,
+  requestAccessToken,
   type PickedSlides,
 } from "../services/googleSlides";
+import { ImportError } from "../types";
+import { GoogleDriveBrowser } from "./GoogleDriveBrowser";
 import type { ImportProgress as Progress, ImportResultOk } from "../types";
 import { GoogleSlidesImport } from "./GoogleSlidesImport";
 import { ImportProgress } from "./ImportProgress";
@@ -35,6 +39,7 @@ type Notice = { message: string; kind: "info" | "error" } | null;
 type Phase =
   | { name: "choose" }
   | { name: "confirm-file"; file: File }
+  | { name: "google-browse"; accessToken: string }
   | { name: "confirm-google"; pick: PickedSlides; accessToken: string }
   | { name: "progress"; progress: Progress }
   | { name: "done"; result: ImportResultOk; showReport: boolean };
@@ -203,13 +208,57 @@ export function ImportPresentationModal() {
             <div className="space-y-2.5">
               <LocalPptxUpload onFileSelected={onFileSelected} />
               <GoogleSlidesImport
-                onPicked={(pick, token) =>
-                  setPhase({ name: "confirm-google", pick, accessToken: token })
-                }
+                onConnected={(token) => {
+                  setNotice(null);
+                  setPhase({ name: "google-browse", accessToken: token });
+                }}
                 onNotice={(message, kind) => setNotice({ message, kind })}
               />
             </div>
           </>
+        ) : null}
+
+        {phase.name === "google-browse" ? (
+          <div className="pt-1">
+            <GoogleDriveBrowser
+              accessToken={phase.accessToken}
+              onSelect={(pick) =>
+                setPhase({
+                  name: "confirm-google",
+                  pick,
+                  accessToken: phase.accessToken,
+                })
+              }
+              onReconnect={() => {
+                void (async () => {
+                  try {
+                    const token = await requestAccessToken();
+                    setPhase({ name: "google-browse", accessToken: token });
+                  } catch (err) {
+                    setPhase({ name: "choose" });
+                    setNotice({
+                      message:
+                        err instanceof GoogleCancelledError ||
+                        err instanceof ImportError
+                          ? err.message
+                          : "Google sign-in could not be completed. Try again in a moment.",
+                      kind:
+                        err instanceof GoogleCancelledError ? "info" : "error",
+                    });
+                  }
+                })();
+              }}
+            />
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setPhase({ name: "choose" })}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-brand-300"
+              >
+                <ArrowLeft size={15} /> Back
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {phase.name === "confirm-file" || phase.name === "confirm-google" ? (
@@ -232,7 +281,13 @@ export function ImportPresentationModal() {
             <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setPhase({ name: "choose" })}
+                onClick={() =>
+                  setPhase(
+                    phase.name === "confirm-google"
+                      ? { name: "google-browse", accessToken: phase.accessToken }
+                      : { name: "choose" },
+                  )
+                }
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-brand-300"
               >
                 <ArrowLeft size={15} /> Back

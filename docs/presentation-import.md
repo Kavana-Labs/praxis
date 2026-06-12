@@ -58,7 +58,8 @@ implementation can be introduced later without touching the stages.
 | `convert/praxisDocumentConverter.ts` | Intermediate model → validated PraxisDocument |
 | `report/importReportBuilder.ts` | Warnings → summary + grouped report |
 | `services/importPresentation.ts` | Validation, progress, persistence (service boundary) |
-| `services/googleSlides.ts` | GIS token, Picker, Drive export → shared pipeline |
+| `services/googleSlides.ts` | GIS token, Drive listing, Drive export → shared pipeline |
+| `components/GoogleDriveBrowser.tsx` | Native in-modal Drive file browser (search/paging) |
 | `components/` | Modal, upload, progress, summary, report UI |
 
 ## Fidelity tiers
@@ -102,17 +103,29 @@ degrees. All conversion lives in `pptx/unitConversion.ts`.
 ## Google Slides flow
 
 1. The user clicks **Import from Google Slides** and grants a token via
-   Google Identity Services with the **`drive.file`** scope — combined with
-   the Picker, Praxis can read *only* the presentations the user explicitly
-   selects. The integration is read-only.
-2. The Picker (filtered to presentations, single-select) yields a file id.
-3. The file is exported as `.pptx` via
+   Google Identity Services with the read-only **`drive.readonly`** scope.
+2. **Praxis's own Drive browser** (an in-modal panel — search, recency
+   ordering, paging) lists the user's Slides presentations through the Drive
+   REST API with the bearer token. There is **no Google Picker iframe**: the
+   Picker depends on third-party cookies for its session, which
+   Safari/Brave/incognito block, dead-ending users at an unrecoverable
+   sign-in wall. The native browser works in every browser and uses the
+   Praxis design language.
+3. The selected file is exported as `.pptx` via
    `GET drive/v3/files/{id}/export?mimeType=…presentationml.presentation`.
 4. The bytes enter the same pipeline as a local upload.
 
-Handled error paths: consent or Picker cancelled (calm notice), expired
-token, missing permission, file not found, Google unreachable, export
-failure, and the Drive **export size limit** (~10 MB), which shows:
+Scope tradeoff, made deliberately: `drive.readonly` is a Google "sensitive"
+scope, so until the app passes Google's verification review users see an
+"unverified app" interstitial (Advanced → continue). The previous
+`drive.file` + Picker combination avoided that interstitial but was unusable
+wherever third-party cookies are blocked. Praxis remains strictly read-only
+and only ever downloads the one presentation the user selects.
+
+Handled error paths: consent cancelled (calm notice), expired token (inline
+"Reconnect Google Drive"), listing failures with retry, missing permission,
+file not found, Google unreachable, export failure, and the Drive
+**export size limit** (~10 MB), which shows:
 
 > This Google Slides presentation is too large to import directly. Download
 > it as a `.pptx` file from Google Slides and upload the PowerPoint file
@@ -126,7 +139,7 @@ values** — the token flow uses no client secret anywhere):
 ```
 VITE_GOOGLE_CLIENT_ID=   # OAuth 2.0 Web client id (Google Cloud Console)
 VITE_GOOGLE_API_KEY=     # API key with the Picker API enabled
-VITE_GOOGLE_APP_ID=      # optional: Cloud project number (improves drive.file scoping)
+VITE_GOOGLE_APP_ID=      # optional: Cloud project number (reserved; unused by the native browser)
 ```
 
 Cloud Console setup: enable **Google Picker API** and **Google Drive API**,
@@ -157,7 +170,8 @@ Uploaded files are untrusted input:
   DOMPurify sanitizer (span `style` restricted to a literal `color: #hex`);
 - macros, embedded scripts, and OLE objects are never executed — they become
   placeholders;
-- Google access tokens stay in memory, are never persisted, and never logged.
+- Google access is read-only (`drive.readonly`); tokens stay in memory, are
+  never persisted, and never logged.
 
 ## Limits (configurable in `types.ts` → `DEFAULT_IMPORT_LIMITS`)
 
@@ -199,6 +213,11 @@ limit.
   are not set for this deployment.
 - **Google popup closes immediately** — the origin is missing from the OAuth
   client's authorized JavaScript origins.
+- **"Google hasn't verified this app" interstitial** — expected until the app
+  passes Google verification for the sensitive read-only scope; click
+  Advanced → continue, or add accounts as test users while unpublished.
+- **"Session expired" in the file browser** — tokens last ~1 hour; use the
+  inline Reconnect button.
 - **"too large to import directly" (Google)** — Drive's export limit;
   download as `.pptx` from Google Slides and upload it.
 - **Deck imports but doesn't persist** — browser storage quota; the notice in
