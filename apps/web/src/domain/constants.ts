@@ -52,4 +52,5 @@ export const DEFAULT_OBJECT_SIZE = {
 /** localStorage key prefixes for the persistence adapter. */
 export const STORAGE_PREFIX = "praxis:doc:";
 export const STORAGE_INDEX_KEY = "praxis:index";
+export const STORAGE_TRASH_KEY = "praxis:trash";
 export const STORAGE_LAST_OPENED_KEY = "praxis:last-opened";

@@ -2,10 +2,15 @@ import {
   STORAGE_INDEX_KEY,
   STORAGE_LAST_OPENED_KEY,
   STORAGE_PREFIX,
+  STORAGE_TRASH_KEY,
 } from "@/domain/constants";
 import { exportDocument, importDocument } from "@/domain/serialize";
 import type { PraxisDocument } from "@/domain/types";
-import type { DocumentSummary, PersistenceAdapter } from "./adapter";
+import type {
+  DocumentSummary,
+  PersistenceAdapter,
+  TrashedDocumentSummary,
+} from "./adapter";
 
 /**
  * localStorage-backed persistence. Documents are stored as deterministic JSON
@@ -58,9 +63,63 @@ export class LocalStorageAdapter implements PersistenceAdapter {
   async remove(id: string): Promise<void> {
     this.storage.removeItem(STORAGE_PREFIX + id);
     this.writeIndex(this.readIndex().filter((s) => s.id !== id));
+    this.writeTrash(this.readTrash().filter((s) => s.id !== id));
     if ((await this.getLastOpenedId()) === id) {
       await this.setLastOpenedId(null);
     }
+  }
+
+  private readTrash(): TrashedDocumentSummary[] {
+    const raw = this.storage.getItem(STORAGE_TRASH_KEY);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as TrashedDocumentSummary[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private writeTrash(trash: TrashedDocumentSummary[]): void {
+    this.storage.setItem(STORAGE_TRASH_KEY, JSON.stringify(trash));
+  }
+
+  async trash(id: string): Promise<void> {
+    const index = this.readIndex();
+    const summary = index.find((s) => s.id === id);
+    if (!summary) return; // unknown or already trashed
+    this.writeIndex(index.filter((s) => s.id !== id));
+    this.writeTrash([
+      { ...summary, deletedAt: new Date().toISOString() },
+      ...this.readTrash().filter((s) => s.id !== id),
+    ]);
+    if ((await this.getLastOpenedId()) === id) {
+      await this.setLastOpenedId(null);
+    }
+  }
+
+  async listTrash(): Promise<TrashedDocumentSummary[]> {
+    return this.readTrash().sort((a, b) =>
+      b.deletedAt.localeCompare(a.deletedAt),
+    );
+  }
+
+  async restore(id: string): Promise<void> {
+    const trash = this.readTrash();
+    const entry = trash.find((s) => s.id === id);
+    if (!entry) return;
+    this.writeTrash(trash.filter((s) => s.id !== id));
+    const { deletedAt: _deletedAt, ...summary } = entry;
+    void _deletedAt;
+    this.writeIndex([
+      ...this.readIndex().filter((s) => s.id !== id),
+      summary,
+    ]);
+  }
+
+  async purge(id: string): Promise<void> {
+    this.writeTrash(this.readTrash().filter((s) => s.id !== id));
+    this.storage.removeItem(STORAGE_PREFIX + id);
   }
 
   async getLastOpenedId(): Promise<string | null> {

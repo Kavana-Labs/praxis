@@ -109,3 +109,44 @@ describe("seed deck", () => {
     expect(a.id).not.toBe(SEED_DOCUMENT_ID);
   });
 });
+
+const makeAdapter = () => new LocalStorageAdapter(new MemoryStorage());
+
+describe("trash lifecycle", () => {
+  it("trash hides from list, appears in trash, restore brings it back", async () => {
+    const adapter = makeAdapter();
+    const doc = createDocument({ title: "Trashable" });
+    await adapter.save(doc);
+    expect((await adapter.list()).some((s) => s.id === doc.id)).toBe(true);
+
+    await adapter.trash(doc.id);
+    expect((await adapter.list()).some((s) => s.id === doc.id)).toBe(false);
+    const trash = await adapter.listTrash();
+    expect(trash.some((s) => s.id === doc.id && s.deletedAt)).toBe(true);
+    // Content is preserved while trashed.
+    expect(await adapter.load(doc.id)).not.toBeNull();
+
+    await adapter.restore(doc.id);
+    expect((await adapter.list()).some((s) => s.id === doc.id)).toBe(true);
+    expect((await adapter.listTrash()).some((s) => s.id === doc.id)).toBe(false);
+  });
+
+  it("purge permanently removes a trashed document", async () => {
+    const adapter = makeAdapter();
+    const doc = createDocument({ title: "Gone forever" });
+    await adapter.save(doc);
+    await adapter.trash(doc.id);
+    await adapter.purge(doc.id);
+    expect(await adapter.load(doc.id)).toBeNull();
+    expect((await adapter.listTrash()).some((s) => s.id === doc.id)).toBe(false);
+  });
+
+  it("trashing the last-opened document clears the pointer", async () => {
+    const adapter = makeAdapter();
+    const doc = createDocument({ title: "Open me" });
+    await adapter.save(doc);
+    await adapter.setLastOpenedId(doc.id);
+    await adapter.trash(doc.id);
+    expect(await adapter.getLastOpenedId()).toBeNull();
+  });
+});

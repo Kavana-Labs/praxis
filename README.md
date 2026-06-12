@@ -31,6 +31,10 @@ rewrite.
 - **Local autosave** (localStorage) + **versioned JSON import/export** with graceful failure.
 - **Present Mode** — a dedicated full-screen renderer with keyboard navigation.
 - **Seeded example deck** — *Modeling Harmonic Motion*.
+- **Document dashboard** (`/app`) — create blank decks, start from real
+  scientific templates (thesis defense, research study, engineering review,
+  CS talk), manage your library with live slide previews, search, rename,
+  export, and a recoverable trash.
 - **Presentation import** — upload PowerPoint `.pptx` files or pick a Google
   Slides presentation (exported to `.pptx` server-side by Google, parsed by the
   same importer). Supported content becomes editable Praxis objects; the rest
