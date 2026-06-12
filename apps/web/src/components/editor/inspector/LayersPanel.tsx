@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Layers as LayersIcon } from "lucide-react";
+import { Eye, EyeOff, Layers as LayersIcon, Lock } from "lucide-react";
 import { useEditorStore } from "@/stores/editor-store";
 import { getSlideObjects, useActiveSlide } from "@/stores/selectors";
 import { OBJECT_TYPE_ICONS, objectLabel } from "@/components/objects/objectMeta";
@@ -31,22 +31,34 @@ export function LayersPanel() {
           return (
             <div
               key={object.id}
+              role="button"
+              tabIndex={0}
               onClick={() => select([object.id])}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  select([object.id]);
+                }
+              }}
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors",
+                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-brand-300",
                 active ? "bg-brand-50 text-brand-700" : "hover:bg-gray-100 text-gray-700",
               )}
             >
               <Icon size={14} className={active ? "text-brand-500" : "text-gray-400"} />
               <span className="flex-1 truncate text-xs">{objectLabel(object)}</span>
+              {object.locked ? (
+                <Lock size={12} className="text-amber-500" aria-label="Locked" />
+              ) : null}
               <button
                 type="button"
                 title={object.hidden ? "Show" : "Hide"}
+                aria-label={object.hidden ? "Show object" : "Hide object"}
                 onClick={(e) => {
                   e.stopPropagation();
                   updateObject(object.id, { hidden: !object.hidden });
                 }}
-                className="text-gray-400 hover:text-gray-700"
+                className="text-gray-400 transition-colors hover:text-gray-700"
               >
                 {object.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>

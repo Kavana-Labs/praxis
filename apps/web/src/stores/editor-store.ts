@@ -7,6 +7,7 @@ import {
   createObject,
   createSlide,
 } from "@/domain/factory";
+import { findInsertionBounds } from "@/domain/placement";
 import { artifactToAsset } from "@/lib/assets";
 import type {
   Bounds,
@@ -52,6 +53,10 @@ export type EditorState = {
   _transformSnapshot: PraxisDocument | null;
   _transformDirty: boolean;
 
+  // internal clipboard (session-only, never persisted)
+  clipboard: cmd.ClipboardPayload | null;
+  _pasteCount: number;
+
   // ---- derived helpers ----
   canUndo: () => boolean;
   canRedo: () => boolean;
@@ -74,7 +79,14 @@ export type EditorState = {
   ) => void;
 
   // ---- objects ----
-  insertObject: (type: PraxisObjectType, slideId?: string) => string;
+  insertObject: (
+    type: PraxisObjectType,
+    opts?: {
+      slideId?: string;
+      size?: { width: number; height: number };
+      patch?: Record<string, unknown>;
+    },
+  ) => string;
   /**
    * Merge a partial patch into an object (records one history step). The patch
    * is intentionally loosely typed: callers are type-specific field forms and
@@ -85,8 +97,14 @@ export type EditorState = {
   updateObjectLive: (objectId: string, patch: Record<string, unknown>) => void;
   moveObject: (objectId: string, bounds: Bounds) => void;
   resizeObject: (objectId: string, bounds: Bounds) => void;
+  /** Nudge every selected object by a logical delta (one history entry). */
+  nudgeSelected: (dx: number, dy: number) => void;
   deleteObjects: (objectIds: string[]) => void;
   duplicateObject: (objectId: string) => void;
+  /** Copy the current selection to the internal clipboard. */
+  copySelection: () => boolean;
+  /** Paste the clipboard onto the active slide (cascading offset per paste). */
+  pasteClipboard: () => void;
   bringForward: (objectId: string) => void;
   sendBackward: (objectId: string) => void;
   bringToFront: (objectId: string) => void;
@@ -122,6 +140,8 @@ export type EditorState = {
   beginTransform: () => void;
   transformLive: (recipe: DocRecipe) => void;
   endTransform: () => void;
+  /** Abort the session and restore the pre-gesture document (no history entry). */
+  cancelTransform: () => void;
 
   // ---- history ----
   undo: () => void;
@@ -177,6 +197,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
     future: [],
     _transformSnapshot: null,
     _transformDirty: false,
+    clipboard: null,
+    _pasteCount: 0,
 
     canUndo: () => get().past.length > 0,
     canRedo: () => get().future.length > 0,
@@ -258,9 +280,23 @@ export const useEditorStore = create<EditorState>((set, get) => {
       mutate((doc) => cmd.cmdUpdateSlide(doc, slideId, patch)),
 
     // ---- objects ----
-    insertObject: (type, slideId) => {
-      const targetSlide = slideId ?? get().activeSlideId;
-      const object = createObject(type);
+    insertObject: (type, opts) => {
+      const targetSlide = opts?.slideId ?? get().activeSlideId;
+      // Place at the type's home position, cascaded past existing objects so
+      // consecutive inserts never stack exactly on top of each other.
+      const placed = findInsertionBounds(
+        get().document,
+        targetSlide,
+        type,
+        opts?.size,
+      );
+      const object = createObject(type, placed);
+      if (opts?.patch) {
+        const { id: _id, type: _type, ...safe } = opts.patch;
+        void _id;
+        void _type;
+        Object.assign(object, safe);
+      }
       mutate((doc) => {
         // Citations and references need a backing record.
         if (object.type === "citation") {
@@ -269,7 +305,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         }
         cmd.cmdInsertObject(doc, targetSlide, object);
       });
-      set({ selectedObjectIds: [object.id] });
+      set({ selectedObjectIds: [object.id], editingObjectId: null });
       return object.id;
     },
 
@@ -280,10 +316,20 @@ export const useEditorStore = create<EditorState>((set, get) => {
       get().transformLive((doc) => cmd.cmdUpdateObject(doc, objectId, patch)),
 
     moveObject: (objectId, bounds) =>
-      mutate((doc) => cmd.cmdSetObjectBounds(doc, objectId, bounds)),
+      mutate((doc) => cmd.cmdMoveObjectTo(doc, objectId, bounds.x, bounds.y)),
 
     resizeObject: (objectId, bounds) =>
       mutate((doc) => cmd.cmdSetObjectBounds(doc, objectId, bounds)),
+
+    nudgeSelected: (dx, dy) => {
+      const ids = get().selectedObjectIds;
+      if (ids.length === 0) return;
+      mutate((doc) => {
+        for (const id of ids) {
+          if (!doc.objects[id]?.locked) cmd.cmdMoveObjectBy(doc, id, dx, dy);
+        }
+      });
+    },
 
     deleteObjects: (objectIds) => {
       if (objectIds.length === 0) return;
@@ -292,6 +338,10 @@ export const useEditorStore = create<EditorState>((set, get) => {
         selectedObjectIds: s.selectedObjectIds.filter(
           (id) => !objectIds.includes(id),
         ),
+        editingObjectId:
+          s.editingObjectId && objectIds.includes(s.editingObjectId)
+            ? null
+            : s.editingObjectId,
       }));
     },
 
@@ -301,6 +351,31 @@ export const useEditorStore = create<EditorState>((set, get) => {
         cloneId = cmd.cmdDuplicateObject(doc, objectId);
       });
       if (cloneId) set({ selectedObjectIds: [cloneId] });
+    },
+
+    copySelection: () => {
+      const { document, selectedObjectIds } = get();
+      const payload = cmd.buildClipboardPayload(document, selectedObjectIds);
+      if (!payload) return false;
+      set({ clipboard: payload, _pasteCount: 0 });
+      return true;
+    },
+
+    pasteClipboard: () => {
+      const { clipboard, activeSlideId, _pasteCount } = get();
+      if (!clipboard) return;
+      const offset = 24 * (_pasteCount + 1);
+      let newIds: string[] = [];
+      mutate((doc) => {
+        newIds = cmd.cmdPasteObjects(doc, activeSlideId, clipboard, offset);
+      });
+      if (newIds.length > 0) {
+        set({
+          selectedObjectIds: newIds,
+          editingObjectId: null,
+          _pasteCount: _pasteCount + 1,
+        });
+      }
     },
 
     bringForward: (objectId) =>
@@ -432,7 +507,23 @@ export const useEditorStore = create<EditorState>((set, get) => {
         set({
           past: [...past, _transformSnapshot].slice(-HISTORY_LIMIT),
           future: [],
+          _transformSnapshot: null,
+          _transformDirty: false,
         });
+        return;
+      }
+      set({ _transformSnapshot: null, _transformDirty: false });
+    },
+
+    cancelTransform: () => {
+      const { _transformSnapshot, _transformDirty } = get();
+      if (_transformSnapshot && _transformDirty) {
+        set({
+          document: _transformSnapshot,
+          _transformSnapshot: null,
+          _transformDirty: false,
+        });
+        return;
       }
       set({ _transformSnapshot: null, _transformDirty: false });
     },
@@ -441,6 +532,9 @@ export const useEditorStore = create<EditorState>((set, get) => {
     undo: () => {
       const { past, future, document, activeSlideId, selectedObjectIds } = get();
       if (past.length === 0) return;
+      // Never rewind mid drag/resize/edit session — the session snapshot would
+      // commit a stale document on top of the rewound one.
+      if (get()._transformSnapshot) return;
       const previous = past[past.length - 1];
       const refs = reconcileRefs(previous, activeSlideId, selectedObjectIds);
       set({
@@ -455,6 +549,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
     redo: () => {
       const { past, future, document, activeSlideId, selectedObjectIds } = get();
       if (future.length === 0) return;
+      if (get()._transformSnapshot) return; // see undo()
+
       const next = future[0];
       const refs = reconcileRefs(next, activeSlideId, selectedObjectIds);
       set({

@@ -134,3 +134,90 @@
     @apply bg-background text-foreground;
   }
 }
+/* ---------------------------------------------------------------------------
+ * Editor canvas interaction state
+ * ------------------------------------------------------------------------- */
+
+body.praxis-dragging,
+body.praxis-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+body.praxis-resizing {
+  user-select: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Rich text content (text objects) — rendered view, inline editor, and
+ * Present Mode all share these classes. Tailwind preflight strips list
+ * markers and margins, so the semantics are restored here.
+ * ------------------------------------------------------------------------- */
+
+.praxis-richtext p,
+.praxis-richtext-editor p {
+  margin: 0 0 0.4em;
+}
+
+.praxis-richtext p:last-child,
+.praxis-richtext-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.praxis-richtext ul,
+.praxis-richtext-editor ul {
+  list-style: disc;
+  padding-left: 1.4em;
+  margin: 0.2em 0 0.4em;
+}
+
+.praxis-richtext ol,
+.praxis-richtext-editor ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+  margin: 0.2em 0 0.4em;
+}
+
+.praxis-richtext li,
+.praxis-richtext-editor li {
+  margin: 0.1em 0;
+}
+
+.praxis-richtext a,
+.praxis-richtext-editor a {
+  color: #652ff3;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.praxis-richtext code,
+.praxis-richtext-editor code {
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  font-size: 0.875em;
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.praxis-richtext blockquote,
+.praxis-richtext-editor blockquote {
+  border-left: 3px solid #e2e8f0;
+  padding-left: 0.8em;
+  margin: 0.3em 0;
+  color: #475569;
+}
+
+.praxis-richtext strong,
+.praxis-richtext-editor strong {
+  font-weight: 700;
+}
+
+/* The ProseMirror root must fill the box so clicks anywhere begin editing. */
+.praxis-richtext-editor {
+  min-height: 100%;
+}
+
+.praxis-richtext-editor:focus,
+.praxis-richtext-editor:focus-visible {
+  outline: none;
+}

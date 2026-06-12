@@ -1,22 +1,9 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
-
-export type AuthUser = {
-  id: string;
-  name?: string;
-  roles?: string[];
-  permissions?: string[];
-};
-
-type AuthContextValue = {
-  user: AuthUser | null;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
-  roles: string[];
-  permissions: string[];
-  hasRole: (role: string) => boolean;
-  hasPermission: (permission: string) => boolean;
-  setUser: (user: AuthUser | null) => void;
-};
+import React, { useMemo, useState } from "react";
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthUser,
+} from "./auth-store";
 
 const STORAGE_KEY = "praxis_auth_user";
 
@@ -34,8 +21,6 @@ const readStoredUser = (): AuthUser | null => {
     return null;
   }
 };
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
@@ -68,10 +53,3 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return context;
-};

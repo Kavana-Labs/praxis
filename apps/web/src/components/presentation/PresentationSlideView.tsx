@@ -12,7 +12,7 @@ import {
 /**
  * Renders a single presentation slide: the same bounded 16:9 stage as the
  * editor, but static and driven entirely by the projection + object renderers.
- * No editor controls, no react-rnd, no editor DOM.
+ * No editor controls, no interaction layer, no editor DOM.
  */
 export function PresentationSlideView({
   slide,

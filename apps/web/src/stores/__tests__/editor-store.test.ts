@@ -297,3 +297,189 @@ describe("selectors", () => {
     expect(ordered).toEqual([b, a]);
   });
 });
+
+describe("history safety", () => {
+  it("blocks undo/redo while a transform session is active", () => {
+    const id = store().insertObject("text");
+    const before = store().document.objects[id].x;
+
+    store().beginTransform();
+    store().transformLive((doc) => {
+      doc.objects[id].x = before + 100;
+    });
+    // A mid-session undo must be a no-op (it would corrupt the session).
+    store().undo();
+    expect(store().document.objects[id].x).toBe(before + 100);
+    store().endTransform();
+
+    // After the session, undo works and lands at the pre-session document.
+    store().undo();
+    expect(store().document.objects[id].x).toBe(before);
+  });
+
+  it("cancelTransform restores the pre-gesture document without history", () => {
+    const id = store().insertObject("text");
+    const before = store().document.objects[id].x;
+    const pastBefore = store().past.length;
+
+    store().beginTransform();
+    store().transformLive((doc) => {
+      doc.objects[id].x = before + 200;
+    });
+    store().cancelTransform();
+
+    expect(store().document.objects[id].x).toBe(before);
+    expect(store().past.length).toBe(pastBefore);
+  });
+
+  it("a no-op move records no history (click is never an edit)", () => {
+    const id = store().insertObject("text");
+    const obj = store().document.objects[id];
+    const pastBefore = store().past.length;
+
+    store().beginTransform();
+    store().transformLive((doc) => {
+      // Same bounds — the command layer must detect the no-op.
+      doc.objects[id].x = obj.x;
+    });
+    store().endTransform();
+
+    expect(store().past.length).toBe(pastBefore);
+  });
+
+  it("clears editingObjectId when the edited object is deleted", () => {
+    const id = store().insertObject("text");
+    store().setEditingObject(id);
+    store().deleteObjects([id]);
+    expect(store().editingObjectId).toBeNull();
+  });
+});
+
+describe("clipboard", () => {
+  it("copies and pastes an object with a fresh id and an offset", () => {
+    const id = store().insertObject("text");
+    const source = store().document.objects[id];
+
+    expect(store().copySelection()).toBe(true);
+    store().pasteClipboard();
+
+    const pastedId = store().selectedObjectIds[0];
+    expect(pastedId).not.toBe(id);
+    const pasted = store().document.objects[pastedId];
+    expect(pasted.x).toBe(source.x + 24);
+    expect(pasted.y).toBe(source.y + 24);
+
+    // A second paste cascades further.
+    store().pasteClipboard();
+    const second = store().document.objects[store().selectedObjectIds[0]];
+    expect(second.x).toBe(source.x + 48);
+  });
+
+  it("paste works across slides and after the source is deleted", () => {
+    const id = store().insertObject("citation");
+    expect(store().copySelection()).toBe(true);
+    store().deleteObjects([id]);
+
+    const newSlide = store().createSlide();
+    store().pasteClipboard();
+
+    const pastedId = store().selectedObjectIds[0];
+    const pasted = store().document.objects[pastedId];
+    expect(pasted).toBeDefined();
+    const slide = store().document.slides.find((s) => s.id === newSlide);
+    expect(slide?.objectIds).toContain(pastedId);
+    // The citation record was re-created, not shared with the deleted source.
+    if (pasted.type === "citation") {
+      expect(store().document.citations[pasted.citationId]).toBeDefined();
+    } else {
+      throw new Error("expected citation");
+    }
+  });
+
+  it("copy returns false with nothing selected", () => {
+    store().clearSelection();
+    expect(store().copySelection()).toBe(false);
+  });
+});
+
+describe("nudge", () => {
+  it("nudges all selected unlocked objects in one history entry", () => {
+    const a = store().insertObject("text");
+    const b = store().insertObject("text");
+    store().select([a, b]);
+    const ax = store().document.objects[a].x;
+    const bx = store().document.objects[b].x;
+    const pastBefore = store().past.length;
+
+    store().nudgeSelected(10, 0);
+
+    expect(store().document.objects[a].x).toBe(ax + 10);
+    expect(store().document.objects[b].x).toBe(bx + 10);
+    expect(store().past.length).toBe(pastBefore + 1);
+
+    store().undo();
+    expect(store().document.objects[a].x).toBe(ax);
+    expect(store().document.objects[b].x).toBe(bx);
+  });
+
+  it("never nudges locked objects", () => {
+    const id = store().insertObject("text");
+    store().updateObject(id, { locked: true });
+    const x = store().document.objects[id].x;
+    store().select([id]);
+    store().nudgeSelected(10, 0);
+    expect(store().document.objects[id].x).toBe(x);
+  });
+});
+
+describe("insert placement", () => {
+  it("cascades consecutive inserts so objects never stack exactly", () => {
+    const a = store().insertObject("text");
+    const b = store().insertObject("text");
+    const c = store().insertObject("text");
+    const oa = store().document.objects[a];
+    const ob = store().document.objects[b];
+    const oc = store().document.objects[c];
+    expect([ob.x, ob.y]).not.toEqual([oa.x, oa.y]);
+    expect([oc.x, oc.y]).not.toEqual([ob.x, ob.y]);
+  });
+
+  it("places headings near the top and citations near the bottom", () => {
+    const h = store().insertObject("heading");
+    const c = store().insertObject("citation");
+    expect(store().document.objects[h].y).toBeLessThan(200);
+    expect(store().document.objects[c].y).toBeGreaterThan(450);
+  });
+
+  it("applies a patch atomically in the same history entry", () => {
+    const pastBefore = store().past.length;
+    const id = store().insertObject("shape", {
+      size: { width: 880, height: 24 },
+      patch: { shape: "divider" },
+    });
+    const obj = store().document.objects[id];
+    if (obj.type !== "shape") throw new Error("expected shape");
+    expect(obj.shape).toBe("divider");
+    expect(obj.width).toBe(880);
+    expect(store().past.length).toBe(pastBefore + 1);
+  });
+});
+
+describe("duplicates never share citation records", () => {
+  it("cmdDuplicateObject clones the backing record", () => {
+    const id = store().insertObject("citation");
+    const source = store().document.objects[id];
+    if (source.type !== "citation") throw new Error("expected citation");
+
+    store().duplicateObject(id);
+    const cloneId = store().selectedObjectIds[0];
+    const clone = store().document.objects[cloneId];
+    if (clone.type !== "citation") throw new Error("expected citation");
+
+    expect(clone.citationId).not.toBe(source.citationId);
+    store().updateCitation(clone.citationId, { title: "Changed" });
+    expect(store().document.citations[source.citationId].title).not.toBe(
+      "Changed",
+    );
+  });
+});

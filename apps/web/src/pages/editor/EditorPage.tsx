@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { exportDocument, importDocument } from "@/domain/serialize";
 import { downloadTextFile, pickTextFile, slugify } from "@/lib/download";
@@ -26,12 +26,6 @@ export function EditorPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [slidesOpen, setSlidesOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-
-  const activeSlideId = useEditorStore((s) => s.activeSlideId);
-  // Close the slides drawer after picking a slide (small screens only).
-  useEffect(() => {
-    setSlidesOpen(false);
-  }, [activeSlideId]);
 
   const handleExport = useCallback(() => {
     const doc = useEditorStore.getState().document;
@@ -93,7 +87,8 @@ export function EditorPage() {
             slidesOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           )}
         >
-          <SlideList />
+          {/* Close the drawer after picking a slide (small screens only). */}
+          <SlideList onSlideChosen={() => setSlidesOpen(false)} />
         </div>
 
         {/* Backdrop for open drawers (below lg) */}

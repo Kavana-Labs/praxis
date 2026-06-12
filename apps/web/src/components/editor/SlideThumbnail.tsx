@@ -1,6 +1,6 @@
+import { memo } from "react";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "@/domain/constants";
-import type { PraxisDocument, SlideContainer } from "@/domain/types";
-import { getSlideObjects } from "@/stores/selectors";
+import type { PraxisObject, PraxisTheme, SlideContainer } from "@/domain/types";
 import { ObjectView } from "@/components/objects/ObjectView";
 import {
   objectBoxStyle,
@@ -12,23 +12,28 @@ import {
  * A static, non-interactive miniature of a slide. Renders the real object
  * renderers at a small scale (via the same logical->pixel transform the editor
  * uses), so thumbnails always match the slide exactly.
+ *
+ * Memoized on the slide + its objects: object references are stable under
+ * Immer structural sharing, so editing one slide never re-renders the others'
+ * thumbnails.
  */
-export function SlideThumbnail({
+export const SlideThumbnail = memo(function SlideThumbnail({
   slide,
-  document,
+  objects,
+  theme,
   width = 168,
 }: {
   slide: SlideContainer;
-  document: PraxisDocument;
+  objects: PraxisObject[];
+  theme: PraxisTheme;
   width?: number;
 }) {
   const scale = width / SLIDE_WIDTH;
   const height = SLIDE_HEIGHT * scale;
-  const objects = getSlideObjects(document, slide);
   const bg =
     slide.background?.type === "color" && slide.background.color
       ? slide.background.color
-      : document.theme.background;
+      : theme.background;
 
   return (
     <div
@@ -69,15 +74,10 @@ export function SlideThumbnail({
               boxShadow: objectShadow(object),
             }}
           >
-            <ObjectView
-              object={object}
-              mode="thumbnail"
-              document={document}
-              theme={document.theme}
-            />
+            <ObjectView object={object} mode="thumbnail" theme={theme} />
           </div>
         ))}
       </div>
     </div>
   );
-}
+});

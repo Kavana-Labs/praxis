@@ -19,7 +19,7 @@ export function MathObjectView({ object }: ObjectViewProps<MathObject>) {
     >
       {empty ? (
         <span style={{ color: "#94a3b8", fontStyle: "italic", fontSize: 18 }}>
-          Empty equation — add LaTeX in the inspector
+          Empty equation — double-click to edit
         </span>
       ) : (
         <Katex latex={object.latex} display={object.display ?? true} />

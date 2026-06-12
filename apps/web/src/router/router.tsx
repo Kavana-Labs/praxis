@@ -17,10 +17,6 @@ export const router = createBrowserRouter([
         lazy: () => import("@/pages/landing/route"),
       },
       {
-            path: "new",
-            lazy: () => import("@/pages/app/slide/route"),
-      },
-      {
         path: toRoutePath(ROUTES.editor),
         lazy: () => import("@/pages/editor/route"),
       },

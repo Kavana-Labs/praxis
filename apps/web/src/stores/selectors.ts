@@ -33,6 +33,18 @@ export function getSelectedObjects(state: EditorState): PraxisObject[] {
 
 export const useActiveSlide = () => useEditorStore(getActiveSlide);
 
+const NO_IDS: string[] = [];
+
+/**
+ * Ordered object ids of the active slide (paint order). Object frames
+ * subscribe to their own object by id, so the canvas only re-keys when
+ * membership or order changes — not on every object edit.
+ */
+export const useActiveSlideObjectIds = () =>
+  useEditorStore(useShallow((s) => getActiveSlide(s)?.objectIds ?? NO_IDS));
+
+export const useTheme = () => useEditorStore((s) => s.document.theme);
+
 // These selectors build a fresh array each call, so they must use a shallow
 // equality check or React will see a new reference every render and loop.
 export const useActiveSlideObjects = () =>
