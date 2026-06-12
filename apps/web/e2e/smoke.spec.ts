@@ -37,7 +37,7 @@ test("seed → navigate → edit math → present → navigate → exit", async 
   await expect(mathObject.locator(".katex").first()).toBeVisible();
 
   // 5 — enter Present Mode. It opens on the active (Equation) slide → "3 / 7".
-  await page.getByRole("button", { name: "Present" }).click();
+  await page.getByRole("button", { name: "Present", exact: true }).click();
   await expect(page).toHaveURL(/\/present/);
   await expect(page.locator("text=/3 \\/ 7/").first()).toBeVisible();
 

@@ -11,6 +11,7 @@ import { InsertToolbar } from "@/components/editor/InsertToolbar";
 import { SlideList } from "@/components/editor/SlideList";
 import { SlideCanvas } from "@/components/canvas/SlideCanvas";
 import { Inspector } from "@/components/editor/inspector/Inspector";
+import { ImportPresentationModal } from "@/features/presentation-import/components/ImportPresentationModal";
 
 /**
  * The Praxis editor shell. Desktop (lg+) shows a persistent three-pane layout
@@ -125,6 +126,8 @@ export function EditorPage() {
           <Inspector />
         </div>
       </div>
+
+      <ImportPresentationModal />
     </div>
   );
 }

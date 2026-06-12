@@ -12,15 +12,22 @@ type UiState = {
   canvasScale: number;
   /** What the pointer is doing on the canvas right now. */
   interaction: CanvasInteraction;
+  /** The Import Presentation modal (opened from several entry points). */
+  importModalOpen: boolean;
   setCanvasScale: (scale: number) => void;
   setInteraction: (interaction: CanvasInteraction) => void;
+  openImportModal: () => void;
+  closeImportModal: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
   canvasScale: 1,
   interaction: "idle",
+  importModalOpen: false,
   setCanvasScale: (canvasScale) =>
     set((s) => (s.canvasScale === canvasScale ? s : { canvasScale })),
   setInteraction: (interaction) =>
     set((s) => (s.interaction === interaction ? s : { interaction })),
+  openImportModal: () => set({ importModalOpen: true }),
+  closeImportModal: () => set({ importModalOpen: false }),
 }));
