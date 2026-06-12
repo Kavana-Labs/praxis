@@ -4,8 +4,10 @@ import { useAuth } from "@/auth/use-auth";
 import { ROUTES } from "./paths";
 
 export const AuthGuard = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, status } = useAuth();
   const location = useLocation();
+
+  if (status === "loading") return null; // session restoring — no flicker
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.login} replace state={{ from: location }} />;
