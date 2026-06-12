@@ -18,6 +18,42 @@ function firstLine(text: string): string {
   return line.length > 60 ? `${line.slice(0, 60)}…` : line;
 }
 
+function ExecStatusPill({
+  status,
+  unavailable,
+  durationMs,
+}: {
+  status: string;
+  unavailable: boolean;
+  durationMs?: number;
+}) {
+  const label = unavailable ? "unavailable" : status;
+  const palette = unavailable
+    ? { bg: "#fef3c7", fg: "#92400e" }
+    : status === "success"
+      ? { bg: "#dcfce7", fg: "#15803d" }
+      : status === "error"
+        ? { bg: "#fee2e2", fg: "#b91c1c" }
+        : { bg: "#e5e7eb", fg: "#6b7280" };
+  return (
+    <span
+      style={{
+        marginLeft: "auto",
+        zIndex: 1,
+        fontSize: 11,
+        padding: "1px 8px",
+        borderRadius: 999,
+        background: palette.bg,
+        color: palette.fg,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+      {status === "success" && durationMs ? ` · ${durationMs}ms` : ""}
+    </span>
+  );
+}
+
 export function CodeObjectView({ object, mode }: ObjectViewProps<CodeObject>) {
   const exec = object.execution;
   const thumb = mode === "thumbnail";
@@ -68,29 +104,11 @@ export function CodeObjectView({ object, mode }: ObjectViewProps<CodeObject>) {
           {filename}
         </span>
         {exec && exec.status !== "idle" ? (
-          <span
-            style={{
-              marginLeft: "auto",
-              zIndex: 1,
-              fontSize: 11,
-              padding: "1px 8px",
-              borderRadius: 999,
-              background:
-                exec.status === "success"
-                  ? "#dcfce7"
-                  : exec.status === "error"
-                    ? "#fee2e2"
-                    : "#e5e7eb",
-              color:
-                exec.status === "success"
-                  ? "#15803d"
-                  : exec.status === "error"
-                    ? "#b91c1c"
-                    : "#6b7280",
-            }}
-          >
-            {exec.status}
-          </span>
+          <ExecStatusPill
+            status={exec.status}
+            unavailable={exec.errorCategory === "INTERNAL_ERROR"}
+            durationMs={exec.durationMs}
+          />
         ) : null}
       </div>
 

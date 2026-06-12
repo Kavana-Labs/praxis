@@ -79,3 +79,76 @@ describe("resizeBounds", () => {
     expect(b.height).toBe(MIN_OBJECT_HEIGHT);
   });
 });
+
+describe("resizeBounds with options", () => {
+  it("respects per-type minimum sizes", () => {
+    const b = resizeBounds(
+      { x: 100, y: 100, width: 400, height: 300 },
+      "se",
+      -1000,
+      -1000,
+      { min: { width: 280, height: 140 } },
+    );
+    expect(b.width).toBe(280);
+    expect(b.height).toBe(140);
+  });
+
+  it("locks aspect ratio from a corner handle (width-driven)", () => {
+    const b = resizeBounds(
+      { x: 100, y: 100, width: 400, height: 200 },
+      "se",
+      200,
+      0,
+      { aspect: 2 },
+    );
+    expect(b.width).toBe(600);
+    expect(b.height).toBe(300);
+    expect(b.x).toBe(100);
+    expect(b.y).toBe(100);
+  });
+
+  it("locks aspect from the north-west corner anchoring the south-east", () => {
+    const start = { x: 400, y: 400, width: 400, height: 200 };
+    const b = resizeBounds(start, "nw", 100, 0, { aspect: 2 });
+    // Right and bottom edges stay anchored.
+    expect(b.x + b.width).toBeCloseTo(start.x + start.width, 5);
+    expect(b.y + b.height).toBeCloseTo(start.y + start.height, 5);
+    expect(b.width / b.height).toBeCloseTo(2, 5);
+  });
+
+  it("derives the cross axis on edge handles when aspect-locked", () => {
+    const b = resizeBounds(
+      { x: 100, y: 300, width: 400, height: 200 },
+      "e",
+      200,
+      0,
+      { aspect: 2 },
+    );
+    expect(b.width).toBe(600);
+    expect(b.height).toBe(300);
+    // Vertically centered around the original box.
+    expect(b.y).toBeCloseTo(300 - 50, 5);
+  });
+
+  it("never flips when dragged past the anchor", () => {
+    const b = resizeBounds(
+      { x: 100, y: 100, width: 200, height: 100 },
+      "e",
+      -5000,
+      0,
+    );
+    expect(b.width).toBeGreaterThan(0);
+    expect(b.x).toBe(100); // anchored west edge unmoved
+  });
+});
+
+describe("moveBounds preserves size", () => {
+  it("never resizes an undersized object while moving it", () => {
+    // Smaller than the global minimum — size must be preserved on move.
+    const b = moveBounds({ x: 100, y: 100, width: 10, height: 8 }, 50, 50);
+    expect(b.width).toBe(10);
+    expect(b.height).toBe(8);
+    expect(b.x).toBe(150);
+    expect(b.y).toBe(150);
+  });
+});

@@ -27,6 +27,13 @@ export function HeadingObjectEditor({ object }: { object: HeadingObject }) {
       ref={ref}
       value={object.text}
       onChange={(e) => updateObjectLive(object.id, { text: e.target.value })}
+      onKeyDown={(e) => {
+        // Headings are single-line: Enter commits and exits editing.
+        if (e.key === "Enter") {
+          e.preventDefault();
+          useEditorStore.getState().setEditingObject(null);
+        }
+      }}
       spellCheck={false}
       style={{
         width: "100%",

@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import type { ArtifactObject } from "@/domain/types";
+import { useEditorStore } from "@/stores/editor-store";
 import type { ObjectViewProps } from "./types";
 
 /**
@@ -8,7 +9,14 @@ import type { ObjectViewProps } from "./types";
  * artifact type never breaks the slide.
  */
 export function ArtifactObjectView({ object, document }: ObjectViewProps<ArtifactObject>) {
-  const asset = object.assetId ? document.assets[object.assetId] : undefined;
+  const storeAsset = useEditorStore((s) =>
+    object.assetId ? s.document.assets[object.assetId] : undefined,
+  );
+  const asset = document
+    ? object.assetId
+      ? document.assets[object.assetId]
+      : undefined
+    : storeAsset;
   const src = object.dataUrl ?? asset?.dataUrl ?? asset?.url ?? null;
   const isImage = object.mimeType.startsWith("image/");
 

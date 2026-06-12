@@ -61,11 +61,21 @@ describe("ObjectView registry", () => {
     expect(container.textContent).toBeDefined();
   });
 
-  it("renders a fallback when an image asset is missing", () => {
+  it("renders an upload hint for an empty image in edit mode", () => {
     const object = createObject("image");
     const { getByText } = render(
       <ObjectView object={object} mode="edit" document={doc} theme={theme} />,
     );
-    expect(getByText(/no image/i)).toBeTruthy();
+    expect(getByText(/double-click to upload/i)).toBeTruthy();
+  });
+
+  it("renders a missing-asset fallback when the asset reference dangles", () => {
+    const object = createObject("image");
+    if (object.type !== "image") throw new Error("expected image");
+    object.assetId = "asset_missing";
+    const { getByText } = render(
+      <ObjectView object={object} mode="edit" document={doc} theme={theme} />,
+    );
+    expect(getByText(/image asset is missing/i)).toBeTruthy();
   });
 });

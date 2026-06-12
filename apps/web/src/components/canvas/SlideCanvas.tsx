@@ -1,9 +1,20 @@
-import { memo, type PointerEvent as ReactPointerEvent } from "react";
-import { Rnd } from "react-rnd";
-import { cmdSetObjectBounds } from "@/domain/commands";
-import type { PraxisDocument, PraxisObject, PraxisTheme } from "@/domain/types";
+import { memo, useCallback, useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
+import {
+  HANDLE_CURSORS,
+  RESIZE_HANDLES,
+  type ResizeHandle,
+} from "@/domain/geometry";
+import type { PraxisObject } from "@/domain/types";
+import { pickImageFile } from "@/lib/assets";
 import { useEditorStore } from "@/stores/editor-store";
-import { useActiveSlide, useActiveSlideObjects } from "@/stores/selectors";
+import {
+  useActiveSlide,
+  useActiveSlideObjectIds,
+  useSelectedObject,
+  useTheme,
+} from "@/stores/selectors";
+import { useUiStore } from "@/stores/ui-store";
 import { ObjectView } from "@/components/objects/ObjectView";
 import {
   objectBoxStyle,
@@ -15,6 +26,20 @@ import { HeadingObjectEditor } from "@/components/objects/editors/HeadingObjectE
 import { CodeObjectEditor } from "@/components/objects/editors/CodeObjectEditor";
 import { MathObjectEditor } from "@/components/objects/editors/MathObjectEditor";
 import { SlideStage } from "./SlideStage";
+import {
+  useObjectInteraction,
+  type ObjectInteraction,
+} from "./useObjectInteraction";
+
+/**
+ * The MVP editor canvas: a bounded 16:9 slide surface with selectable,
+ * draggable, resizable objects. All geometry stays in logical slide units; the
+ * interaction controller converts pointer deltas through the single scale
+ * factor and commits through the command layer, which clamps to slide bounds.
+ *
+ * Deliberately NOT an infinite canvas — there is no global pan or zoom in the
+ * MVP. The same object model will drive the future continuous canvas.
+ */
 
 /** Object types that support inline editing on double-click. */
 const INLINE_EDITABLE = new Set<PraxisObject["type"]>([
@@ -39,141 +64,99 @@ function renderEditor(object: PraxisObject) {
   }
 }
 
-/**
- * The MVP editor canvas: a bounded 16:9 slide surface with selectable,
- * draggable, resizable objects. All geometry stays in logical slide units;
- * react-rnd's `scale` prop maps screen-pixel pointer deltas back into logical
- * units, and the store clamps every result to the slide bounds.
- *
- * Deliberately NOT an infinite canvas — there is no global pan or zoom in the
- * MVP. The same object model will drive the future continuous canvas.
- */
-
-/** Resize handles sized to stay ~constant on screen regardless of slide scale. */
-function makeHandleStyles(scale: number): Record<string, React.CSSProperties> {
-  const s = 11 / scale;
-  const off = -s / 2;
-  const base: React.CSSProperties = {
-    width: s,
-    height: s,
-    background: "#ffffff",
-    border: `${1.5 / scale}px solid #652ff3`,
-    borderRadius: 2 / scale,
-    boxSizing: "border-box",
-  };
-  return {
-    top: { ...base, top: off, left: `calc(50% - ${s / 2}px)` },
-    bottom: { ...base, bottom: off, left: `calc(50% - ${s / 2}px)` },
-    left: { ...base, left: off, top: `calc(50% - ${s / 2}px)` },
-    right: { ...base, right: off, top: `calc(50% - ${s / 2}px)` },
-    topLeft: { ...base, top: off, left: off },
-    topRight: { ...base, top: off, right: off },
-    bottomLeft: { ...base, bottom: off, left: off },
-    bottomRight: { ...base, bottom: off, right: off },
-  };
-}
-
 type ObjectFrameProps = {
-  object: PraxisObject;
+  objectId: string;
   scale: number;
-  selected: boolean;
-  editing: boolean;
-  document: PraxisDocument;
-  theme: PraxisTheme;
+  interaction: ObjectInteraction;
 };
 
 const ObjectFrame = memo(function ObjectFrame({
-  object,
+  objectId,
   scale,
-  selected,
-  editing,
-  document,
-  theme,
+  interaction,
 }: ObjectFrameProps) {
-  const store = useEditorStore;
+  const object = useEditorStore((s) => s.document.objects[objectId]);
+  const selected = useEditorStore((s) =>
+    s.selectedObjectIds.includes(objectId),
+  );
+  const editing = useEditorStore((s) => s.editingObjectId === objectId);
+  const theme = useTheme();
 
-  const onPointerDown = (e: ReactPointerEvent) => {
-    if (editing) return; // let the inner editor handle pointer events
-    e.stopPropagation(); // keep the background handler from clearing selection
-    const s = store.getState();
-    if (e.shiftKey) {
-      s.toggleSelect(object.id);
-    } else if (!s.selectedObjectIds.includes(object.id)) {
-      s.select([object.id]);
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent) => {
+      // While editing, the inner editor owns all pointer events; just keep the
+      // press from bubbling to the stage (which would deselect mid-edit).
+      if (editing) {
+        e.stopPropagation();
+        return;
+      }
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      const store = useEditorStore.getState();
+      if (e.shiftKey) {
+        store.toggleSelect(objectId);
+        return; // toggling never starts a drag
+      }
+      let ids = store.selectedObjectIds;
+      if (!ids.includes(objectId)) {
+        store.select([objectId]);
+        ids = [objectId];
+      }
+      const obj = store.document.objects[objectId];
+      if (!obj || obj.locked) return; // selectable, never draggable
+      interaction.startDrag(e, ids, objectId);
+    },
+    [editing, interaction, objectId],
+  );
+
+  const onDoubleClick = useCallback(() => {
+    const store = useEditorStore.getState();
+    const obj = store.document.objects[objectId];
+    if (!obj || obj.locked) return;
+    if (INLINE_EDITABLE.has(obj.type)) {
+      store.setEditingObject(objectId);
+      return;
     }
-  };
-
-  const onDoubleClick = () => {
-    if (!object.locked && INLINE_EDITABLE.has(object.type)) {
-      store.getState().setEditingObject(object.id);
+    // Double-clicking an empty image frame opens the file picker directly.
+    if (obj.type === "image" && !obj.assetId) {
+      void pickImageFile().then((asset) => {
+        if (asset) useEditorStore.getState().attachImageAsset(objectId, asset);
+      });
     }
-  };
+  }, [objectId]);
 
-  const commitBounds = (bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }) => {
-    store.getState().transformLive((doc) =>
-      cmdSetObjectBounds(doc, object.id, bounds),
-    );
-  };
+  if (!object) return null;
 
   return (
-    <Rnd
-      scale={scale}
-      bounds="parent"
-      position={{ x: object.x, y: object.y }}
-      size={{ width: object.width, height: object.height }}
-      disableDragging={object.locked || editing}
-      enableResizing={selected && !object.locked && !editing}
-      resizeHandleStyles={makeHandleStyles(scale)}
-      onDragStart={() => {
-        if (!store.getState().selectedObjectIds.includes(object.id)) {
-          store.getState().select([object.id]);
-        }
-        store.getState().beginTransform();
-      }}
-      onDrag={(_e, d) =>
-        commitBounds({
-          x: d.x,
-          y: d.y,
-          width: object.width,
-          height: object.height,
-        })
-      }
-      onDragStop={() => store.getState().endTransform()}
-      onResizeStart={() => store.getState().beginTransform()}
-      onResize={(_e, _dir, ref, _delta, position) =>
-        commitBounds({
-          x: position.x,
-          y: position.y,
-          width: ref.offsetWidth,
-          height: ref.offsetHeight,
-        })
-      }
-      onResizeStop={() => store.getState().endTransform()}
-      style={{
-        zIndex: object.zIndex,
-        cursor: object.locked ? "default" : editing ? "default" : "move",
-      }}
+    <div
+      data-object-id={object.id}
+      data-object-type={object.type}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
+      style={{
+        position: "absolute",
+        left: object.x,
+        top: object.y,
+        width: object.width,
+        height: object.height,
+        zIndex: object.zIndex,
+        cursor: "default",
+        touchAction: "none",
+      }}
     >
       <div
-        data-object-id={object.id}
-        data-object-type={object.type}
         style={{
           position: "relative",
           width: "100%",
           height: "100%",
           ...objectBoxStyle(object),
-          outline: selected ? `${2 / scale}px solid #652ff3` : "none",
-          outlineOffset: `${2 / scale}px`,
-          boxShadow: selected
-            ? "none"
-            : (objectShadow(object) ?? "0 1px 3px rgba(15,23,42,0.06)"),
+          outline: selected
+            ? `${1.5 / scale}px solid #652ff3`
+            : object.hidden
+              ? `${1 / scale}px dashed #cbd5e1`
+              : "none",
+          outlineOffset: `${1.5 / scale}px`,
+          boxShadow: selected ? "none" : objectShadow(object),
           // Non-interactive unless editing, so the whole box selects/drags.
           pointerEvents: editing ? "auto" : "none",
           userSelect: editing ? "auto" : "none",
@@ -186,34 +169,139 @@ const ObjectFrame = memo(function ObjectFrame({
           <ObjectView
             object={object}
             mode="edit"
-            document={document}
             theme={theme}
             selected={selected}
           />
         )}
       </div>
-    </Rnd>
+    </div>
   );
 });
 
+/** Handle hit-target stays ~11px on screen regardless of slide scale. */
+function handlePlacement(
+  handle: ResizeHandle,
+  width: number,
+  height: number,
+  size: number,
+): { left: number; top: number } {
+  const half = size / 2;
+  const xs: Record<string, number> = {
+    w: -half,
+    e: width - half,
+    c: width / 2 - half,
+  };
+  const ys: Record<string, number> = {
+    n: -half,
+    s: height - half,
+    c: height / 2 - half,
+  };
+  const xKey = handle.includes("w") ? "w" : handle.includes("e") ? "e" : "c";
+  const yKey = handle.includes("n") ? "n" : handle.includes("s") ? "s" : "c";
+  return { left: xs[xKey], top: ys[yKey] };
+}
+
+/**
+ * Resize handles for the selected object, rendered in a layer above all
+ * objects so they stay reachable even when other objects overlap.
+ */
+function SelectionHandles({
+  scale,
+  interaction,
+}: {
+  scale: number;
+  interaction: ObjectInteraction;
+}) {
+  const object = useSelectedObject();
+  const editing = useEditorStore(
+    (s) => s.editingObjectId !== null && s.editingObjectId === object?.id,
+  );
+  const dragging = useUiStore((s) => s.interaction === "dragging");
+
+  if (!object || object.locked || editing || dragging) return null;
+
+  const size = 11 / scale;
+  const border = 1.5 / scale;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: object.x,
+        top: object.y,
+        width: object.width,
+        height: object.height,
+        zIndex: 10_000,
+        pointerEvents: "none",
+      }}
+    >
+      {RESIZE_HANDLES.map((handle) => {
+        const pos = handlePlacement(handle, object.width, object.height, size);
+        return (
+          <div
+            key={handle}
+            data-resize-handle={handle}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              interaction.startResize(e, object.id, handle);
+            }}
+            style={{
+              position: "absolute",
+              left: pos.left,
+              top: pos.top,
+              width: size,
+              height: size,
+              background: "#ffffff",
+              border: `${border}px solid #652ff3`,
+              borderRadius: 2 / scale,
+              boxSizing: "border-box",
+              cursor: HANDLE_CURSORS[handle],
+              pointerEvents: "auto",
+              touchAction: "none",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function SlideCanvas() {
-  const document = useEditorStore((s) => s.document);
   const activeSlide = useActiveSlide();
-  const objects = useActiveSlideObjects();
-  const selectedIds = useEditorStore((s) => s.selectedObjectIds);
-  const editingObjectId = useEditorStore((s) => s.editingObjectId);
-  const clearSelection = useEditorStore((s) => s.clearSelection);
+  const objectIds = useActiveSlideObjectIds();
+  const theme = useTheme();
+  const empty = objectIds.length === 0;
+
+  const scaleRef = useRef(1);
+  const interaction = useObjectInteraction(scaleRef);
+
+  const handleScaleChange = useCallback((scale: number) => {
+    scaleRef.current = scale;
+    useUiStore.getState().setCanvasScale(scale);
+  }, []);
+
+  const onBackgroundPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      // Only direct presses on the empty stage clear the selection; events
+      // bubbling out of objects/editors never deselect mid-interaction.
+      if (e.target === e.currentTarget) {
+        useEditorStore.getState().clearSelection();
+      }
+    },
+    [],
+  );
 
   return (
     <SlideStage
-      theme={document.theme}
+      theme={theme}
       background={activeSlide?.background}
       padding={36}
-      onBackgroundPointerDown={() => clearSelection()}
+      onBackgroundPointerDown={onBackgroundPointerDown}
+      onScaleChange={handleScaleChange}
     >
       {(scale) => (
         <>
-          {objects.length === 0 ? (
+          {empty ? (
             <div
               style={{
                 position: "absolute",
@@ -224,27 +312,25 @@ export function SlideCanvas() {
                 justifyContent: "center",
                 gap: 8,
                 color: "#94a3b8",
-                fontFamily: document.theme.fontBody,
+                fontFamily: theme.fontBody,
                 pointerEvents: "none",
               }}
             >
               <div style={{ fontSize: 28, fontWeight: 600 }}>Empty slide</div>
               <div style={{ fontSize: 18 }}>
-                Insert an object from the toolbar above to begin.
+                Insert an object from the toolbar below to begin.
               </div>
             </div>
           ) : null}
-          {objects.map((object) => (
+          {objectIds.map((id) => (
             <ObjectFrame
-              key={object.id}
-              object={object}
+              key={id}
+              objectId={id}
               scale={scale}
-              selected={selectedIds.includes(object.id)}
-              editing={editingObjectId === object.id}
-              document={document}
-              theme={document.theme}
+              interaction={interaction}
             />
           ))}
+          <SelectionHandles scale={scale} interaction={interaction} />
         </>
       )}
     </SlideStage>
