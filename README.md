@@ -35,6 +35,11 @@ rewrite.
   scientific templates (thesis defense, research study, engineering review,
   CS talk), manage your library with live slide previews, search, rename,
   export, and a recoverable trash.
+- **Accounts** — full authentication (sign up with email verification, login,
+  Google SSO, password reset, profile management) backed by Firebase
+  Authentication when `VITE_FIREBASE_*` is configured; otherwise a clearly
+  labelled browser-local account mode keeps every flow working (and testable)
+  without a backend. Documents remain local-first either way.
 - **Presentation import** — upload PowerPoint `.pptx` files or pick a Google
   Slides presentation (exported to `.pptx` server-side by Google, parsed by the
   same importer). Supported content becomes editable Praxis objects; the rest
@@ -168,7 +173,7 @@ separately.)
 
 ## Known MVP limitations
 
-- Single local document focus; no accounts, collaboration, or cloud sync.
+- Documents are local to the browser; accounts exist (Firebase) but cloud sync and collaboration ship later.
 - The bounded slide editor only — no infinite-canvas pan/zoom (deliberate; see architecture).
 - Python is the only executable language; dependencies are limited to the runner image
   (NumPy, SymPy, Matplotlib, pandas).

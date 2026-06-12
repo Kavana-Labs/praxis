@@ -1,55 +1,43 @@
-import React, { useMemo, useState } from "react";
-import {
-  AuthContext,
-  type AuthContextValue,
-  type AuthUser,
-} from "./auth-store";
+import React, { useEffect, useMemo, useState } from "react";
+import { AuthContext, type AuthContextValue } from "./auth-store";
+import { getAuthService } from "./services";
+import type { AuthUser } from "./types";
 
-const STORAGE_KEY = "praxis_auth_user";
-
-const readStoredUser = (): AuthUser | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-  try {
-    return JSON.parse(raw) as AuthUser;
-  } catch {
-    return null;
-  }
-};
-
+/**
+ * Provides the live auth session. `status` stays "loading" until the backend
+ * has restored any persisted session, so guards never flash a redirect.
+ */
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
+  const service = getAuthService();
+  const [user, setUser] = useState<AuthUser | null>(service.getCurrentUser());
+  const [status, setStatus] = useState<"loading" | "ready">("loading");
 
-  const value = useMemo<AuthContextValue>(() => {
-    const roles = user?.roles ?? [];
-    const permissions = user?.permissions ?? [];
-    return {
-      user,
-      isAuthenticated: Boolean(user),
-      isAdmin: roles.includes("admin"),
-      roles,
-      permissions,
-      hasRole: (role) => roles.includes(role),
-      hasPermission: (permission) => permissions.includes(permission),
-      setUser: (nextUser) => {
-        setUser(nextUser);
-        if (typeof window === "undefined") {
-          return;
-        }
-        if (nextUser) {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
-        } else {
-          window.localStorage.removeItem(STORAGE_KEY);
-        }
-      },
+  useEffect(() => {
+    const unsubscribe = service.subscribe(setUser);
+    let cancelled = false;
+    void service.ready().then(() => {
+      if (!cancelled) setStatus("ready");
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
     };
-  }, [user]);
+  }, [service]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      status,
+      isAuthenticated: Boolean(user),
+      isAdmin: false,
+      roles: [],
+      permissions: [],
+      hasRole: () => false,
+      hasPermission: () => false,
+      service,
+    }),
+    [user, status, service],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

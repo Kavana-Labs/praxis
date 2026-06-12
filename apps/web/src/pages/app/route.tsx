@@ -6,6 +6,7 @@ import {
   TemplatesView,
   TrashView,
 } from "@/features/dashboard/views";
+import { ProfileView } from "@/features/dashboard/ProfileView";
 
 /**
  * The /app dashboard (Platform Figma): one lazy chunk containing the shell
@@ -20,6 +21,7 @@ export function Component() {
         <Route path="templates" element={<TemplatesView />} />
         <Route path="presentations" element={<PresentationsView />} />
         <Route path="trash" element={<TrashView />} />
+        <Route path="profile" element={<ProfileView />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
     </Routes>
