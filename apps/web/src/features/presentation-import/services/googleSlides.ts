@@ -7,23 +7,30 @@ import {
 import { importPptxBytes } from "./importPresentation";
 
 /**
- * Google Slides import: Google Identity Services token + Google Picker for
- * read-only selection, then a Drive `files.export` to PowerPoint. The
- * exported bytes go through the exact same PPTX pipeline as local uploads.
+ * Google Slides import: Google Identity Services token + Praxis's own Drive
+ * file browser (no Google Picker iframe), then a Drive `files.export` to
+ * PowerPoint. The exported bytes go through the exact same PPTX pipeline as
+ * local uploads.
+ *
+ * Why no Picker: the Picker iframe depends on third-party cookies for its
+ * session, which Safari/Brave/incognito block — users hit an unrecoverable
+ * "sign in" wall. Praxis lists presentations directly through the Drive REST
+ * API with the bearer token instead, which works in every browser.
  *
  * Security model (static frontend — there is no Praxis server in the MVP):
- *  - Only the OAuth *client id*, *API key*, and optional *app id* are used.
- *    These are public-by-design values; no client secret exists in this flow
- *    (token flow, not authorization-code flow).
- *  - Scope is `drive.file`: combined with the Picker, the app can read ONLY
- *    the presentations the user explicitly selects — nothing else.
+ *  - Only the OAuth *client id* and *API key* are used. These are
+ *    public-by-design values; no client secret exists in this flow.
+ *  - Scope is `drive.readonly` (read-only; never write access). This is a
+ *    Google "sensitive" scope: until the app passes Google verification,
+ *    users see an "unverified app" interstitial they can click through.
  *  - Access tokens stay in memory for the import and are never persisted or
  *    logged.
  */
 
-const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const PPTX_EXPORT_MIME =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const SLIDES_MIME = "application/vnd.google-apps.presentation";
 
 export type GoogleConfig = {
   clientId: string;
@@ -43,7 +50,7 @@ export function isGoogleImportConfigured(): boolean {
   return googleConfig() !== null;
 }
 
-/** Thrown when the user dismisses the consent screen or the Picker. */
+/** Thrown when the user dismisses the consent popup. */
 export class GoogleCancelledError extends Error {
   constructor() {
     super("Google Drive connection was cancelled. No files were imported.");
@@ -51,7 +58,15 @@ export class GoogleCancelledError extends Error {
   }
 }
 
-// --- minimal ambient typings for the two Google scripts ---------------------
+/** Thrown when the access token is no longer valid (reconnect required). */
+export class GoogleAuthExpiredError extends Error {
+  constructor() {
+    super("Your Google Drive session expired. Reconnect and try again.");
+    this.name = "GoogleAuthExpiredError";
+  }
+}
+
+// --- minimal ambient typings for Google Identity Services -------------------
 
 type TokenClient = {
   requestAccessToken: (opts?: { prompt?: string }) => void;
@@ -71,40 +86,11 @@ type GoogleGlobal = {
       }) => TokenClient;
     };
   };
-  picker: {
-    Action: { PICKED: string; CANCEL: string };
-    ViewId: { PRESENTATIONS: string };
-    PickerBuilder: new () => PickerBuilder;
-    Feature: { NAV_HIDDEN: string };
-  };
-};
-
-type PickerBuilder = {
-  addView: (view: string) => PickerBuilder;
-  setOAuthToken: (token: string) => PickerBuilder;
-  setDeveloperKey: (key: string) => PickerBuilder;
-  setAppId: (appId: string) => PickerBuilder;
-  setOrigin: (origin: string) => PickerBuilder;
-  setSelectableMimeTypes: (mimeTypes: string) => PickerBuilder;
-  setTitle: (title: string) => PickerBuilder;
-  enableFeature: (feature: string) => PickerBuilder;
-  setCallback: (
-    cb: (data: {
-      action: string;
-      docs?: { id: string; name?: string; mimeType?: string }[];
-    }) => void,
-  ) => PickerBuilder;
-  build: () => { setVisible: (visible: boolean) => void };
-};
-
-type GapiGlobal = {
-  load: (api: string, callback: () => void) => void;
 };
 
 declare global {
   interface Window {
     google?: GoogleGlobal;
-    gapi?: GapiGlobal;
   }
 }
 
@@ -143,27 +129,9 @@ async function ensureGoogleIdentity(): Promise<GoogleGlobal["accounts"]> {
   return accounts;
 }
 
-async function ensurePicker(): Promise<NonNullable<GoogleGlobal["picker"]>> {
-  await loadScript("https://apis.google.com/js/api.js");
-  const gapi = window.gapi;
-  if (!gapi) {
-    throw new ImportError(
-      "Google Picker is unavailable right now. Try again in a moment.",
-    );
-  }
-  await new Promise<void>((resolve) => gapi.load("picker", resolve));
-  const picker = window.google?.picker;
-  if (!picker) {
-    throw new ImportError(
-      "Google Picker is unavailable right now. Try again in a moment.",
-    );
-  }
-  return picker;
-}
+// --- auth ---------------------------------------------------------------------
 
-// --- auth + picker -----------------------------------------------------------
-
-/** Request a short-lived access token (per-file drive scope). */
+/** Request a short-lived, read-only Drive access token. */
 export async function requestAccessToken(): Promise<string> {
   const config = googleConfig();
   if (!config) {
@@ -175,7 +143,7 @@ export async function requestAccessToken(): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const client = accounts.oauth2.initTokenClient({
       client_id: config.clientId,
-      scope: DRIVE_FILE_SCOPE,
+      scope: DRIVE_SCOPE,
       callback: (response) => {
         if (response.access_token) resolve(response.access_token);
         else if (response.error === "access_denied")
@@ -201,47 +169,96 @@ export async function requestAccessToken(): Promise<string> {
   });
 }
 
-export type PickedSlides = { fileId: string; fileName: string };
+// --- Drive file listing (the Praxis browser's data source) -------------------
 
-/** Open the Picker filtered to Google Slides; resolves null on cancel. */
-export async function pickSlidesPresentation(
+export type DriveSlidesFile = {
+  id: string;
+  name: string;
+  modifiedTime?: string;
+  owner?: string;
+  thumbnailLink?: string;
+};
+
+export type DriveSlidesPage = {
+  files: DriveSlidesFile[];
+  nextPageToken?: string;
+};
+
+/** Escape a user-supplied string for a Drive `q` query literal. */
+function escapeDriveQuery(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+/**
+ * List the user's Google Slides presentations, newest activity first,
+ * optionally filtered by name. Paged via `pageToken`.
+ */
+export async function listSlidesPresentations(
   accessToken: string,
-): Promise<PickedSlides | null> {
-  const config = googleConfig();
-  if (!config) {
+  opts: { query?: string; pageToken?: string } = {},
+): Promise<DriveSlidesPage> {
+  const terms = [`mimeType = '${SLIDES_MIME}'`, "trashed = false"];
+  const query = opts.query?.trim();
+  if (query) {
+    terms.push(`name contains '${escapeDriveQuery(query)}'`);
+  }
+
+  const params = new URLSearchParams({
+    q: terms.join(" and "),
+    orderBy: "viewedByMeTime desc,modifiedTime desc",
+    pageSize: "20",
+    fields:
+      "nextPageToken,files(id,name,modifiedTime,owners(displayName),thumbnailLink)",
+    includeItemsFromAllDrives: "true",
+    supportsAllDrives: "true",
+  });
+  if (opts.pageToken) params.set("pageToken", opts.pageToken);
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+  } catch {
     throw new ImportError(
-      "Google Slides import is not configured for this deployment.",
+      "Google Drive could not be reached. Check your connection and try again.",
     );
   }
-  const picker = await ensurePicker();
-  return new Promise<PickedSlides | null>((resolve) => {
-    let builder = new picker.PickerBuilder()
-      .addView(picker.ViewId.PRESENTATIONS)
-      .setOAuthToken(accessToken)
-      .setDeveloperKey(config.apiKey)
-      // Without an explicit origin the Picker can fall back to a separate
-      // tab whose postMessage results never reach the app — the selection
-      // callback silently never fires. Always anchor it to this origin.
-      .setOrigin(window.location.origin)
-      .setSelectableMimeTypes("application/vnd.google-apps.presentation")
-      .setTitle("Choose a Google Slides presentation")
-      .enableFeature(picker.Feature.NAV_HIDDEN)
-      .setCallback((data) => {
-        if (data.action === picker.Action.PICKED) {
-          const doc = data.docs?.[0];
-          if (doc) {
-            resolve({ fileId: doc.id, fileName: doc.name ?? "Google Slides presentation" });
-            return;
-          }
-          resolve(null);
-        } else if (data.action === picker.Action.CANCEL) {
-          resolve(null);
-        }
-      });
-    if (config.appId) builder = builder.setAppId(config.appId);
-    builder.build().setVisible(true);
-  });
+
+  if (response.status === 401) throw new GoogleAuthExpiredError();
+  if (!response.ok) {
+    throw new ImportError(
+      "Google Drive could not list your presentations. Try again in a moment.",
+    );
+  }
+
+  const body = (await response.json()) as {
+    nextPageToken?: string;
+    files?: {
+      id?: string;
+      name?: string;
+      modifiedTime?: string;
+      owners?: { displayName?: string }[];
+      thumbnailLink?: string;
+    }[];
+  };
+
+  return {
+    nextPageToken: body.nextPageToken,
+    files: (body.files ?? [])
+      .filter((f): f is typeof f & { id: string } => Boolean(f.id))
+      .map((f) => ({
+        id: f.id,
+        name: f.name ?? "Untitled presentation",
+        modifiedTime: f.modifiedTime,
+        owner: f.owners?.[0]?.displayName,
+        thumbnailLink: f.thumbnailLink,
+      })),
+  };
 }
+
+export type PickedSlides = { fileId: string; fileName: string };
 
 // --- export ------------------------------------------------------------------
 
@@ -280,9 +297,7 @@ export async function exportSlidesAsPptx(
       );
     }
     if (response.status === 401) {
-      throw new ImportError(
-        "Your Google Drive session expired. Reconnect and try again.",
-      );
+      throw new GoogleAuthExpiredError();
     }
     if (response.status === 404) {
       throw new ImportError(
@@ -323,6 +338,9 @@ export async function importFromGoogleSlides(
       onProgress,
     });
   } catch (err) {
+    if (err instanceof GoogleAuthExpiredError) {
+      return { ok: false, error: err.message };
+    }
     if (err instanceof ImportError) return { ok: false, error: err.message };
     console.error("Google Slides import failed", err);
     return {
