@@ -48,6 +48,33 @@ export async function fileToImageAsset(file: File): Promise<PraxisAsset> {
   };
 }
 
+/**
+ * Open the system file picker for a single image and return it as an asset.
+ * Resolves to null when the user cancels or the file is invalid; callers that
+ * need the error message should use `fileToImageAsset` directly.
+ */
+export function pickImageFile(): Promise<PraxisAsset | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(await fileToImageAsset(file));
+      } catch {
+        resolve(null);
+      }
+    };
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 /** Build an asset from a base64 artifact returned by the execution service. */
 export function artifactToAsset(
   mimeType: string,

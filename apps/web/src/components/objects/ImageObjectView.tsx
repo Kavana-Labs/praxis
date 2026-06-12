@@ -1,9 +1,23 @@
 import { ImageIcon } from "lucide-react";
 import type { ImageObject } from "@/domain/types";
+import { useEditorStore } from "@/stores/editor-store";
 import type { ObjectViewProps } from "./types";
 
-export function ImageObjectView({ object, document }: ObjectViewProps<ImageObject>) {
-  const asset = object.assetId ? document.assets[object.assetId] : undefined;
+export function ImageObjectView({
+  object,
+  document,
+  mode,
+}: ObjectViewProps<ImageObject>) {
+  // Without an explicit document (editor canvas), subscribe to just this
+  // object's asset so unrelated edits never re-render the image.
+  const storeAsset = useEditorStore((s) =>
+    object.assetId ? s.document.assets[object.assetId] : undefined,
+  );
+  const asset = document
+    ? object.assetId
+      ? document.assets[object.assetId]
+      : undefined
+    : storeAsset;
   const src = asset?.dataUrl ?? asset?.url ?? null;
 
   return (
@@ -33,7 +47,13 @@ export function ImageObjectView({ object, document }: ObjectViewProps<ImageObjec
         ) : (
           <div style={{ textAlign: "center", color: "#94a3b8", padding: 16 }}>
             <ImageIcon size={36} strokeWidth={1.5} />
-            <div style={{ marginTop: 8, fontSize: 14 }}>No image — choose a file in the inspector</div>
+            <div style={{ marginTop: 8, fontSize: 14 }}>
+              {object.assetId
+                ? "Image asset is missing"
+                : mode === "edit"
+                  ? "Double-click to upload an image"
+                  : "No image"}
+            </div>
           </div>
         )}
       </div>

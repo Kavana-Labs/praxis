@@ -3,18 +3,21 @@ import {
   ArrowDownToLine,
   ArrowUp,
   ArrowUpToLine,
-  Download,
-  PanelRight,
-  Play,
+  Copy,
+  Eye,
+  EyeOff,
+  Lock,
+  LockOpen,
   Trash2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { cmdUpdateSlide } from "@/domain/commands";
 import { useEditorStore } from "@/stores/editor-store";
 import { useActiveSlide, useSelectedObject } from "@/stores/selectors";
 import { OBJECT_TYPE_LABELS } from "@/components/objects/registry";
 import { OBJECT_TYPE_ICONS } from "@/components/objects/objectMeta";
 import {
   FieldRow,
+  IconToggleButton,
   InspectorButton,
   InspectorSection,
   TextArea,
@@ -25,10 +28,9 @@ import { ObjectProperties } from "./ObjectProperties";
 import { LayersPanel } from "./LayersPanel";
 
 /**
- * Right inspector (Platform Figma). Header with panel controls + Preview and
- * Properties/Animation tabs, then either the selected object's properties
- * (Alignment, Position, Appearance, type-specific, Order, Layers, Delete) or
- * slide settings when nothing is selected.
+ * Right inspector. Shows the selected object's settings (common geometry +
+ * appearance, type-specific fields, layer order) or, with nothing selected,
+ * the active slide's settings. Every control here works — no placeholders.
  */
 export function Inspector() {
   const selected = useSelectedObject();
@@ -36,55 +38,74 @@ export function Inspector() {
   const activeSlide = useActiveSlide();
 
   const deleteObjects = useEditorStore((s) => s.deleteObjects);
+  const duplicateObject = useEditorStore((s) => s.duplicateObject);
+  const updateObject = useEditorStore((s) => s.updateObject);
   const bringForward = useEditorStore((s) => s.bringForward);
   const sendBackward = useEditorStore((s) => s.sendBackward);
   const bringToFront = useEditorStore((s) => s.bringToFront);
   const sendToBack = useEditorStore((s) => s.sendToBack);
-  const updateSlide = useEditorStore((s) => s.updateSlide);
-  const navigate = useNavigate();
+
+  // Slide text fields edit live inside a transform session, so a whole
+  // focus→blur episode lands as a single undo entry.
+  const beginSession = useEditorStore((s) => s.beginTransform);
+  const endSession = useEditorStore((s) => s.endTransform);
+  const live = useEditorStore((s) => s.transformLive);
 
   const SelectedIcon = selected ? OBJECT_TYPE_ICONS[selected.type] : null;
+  const locked = Boolean(selected?.locked);
 
   return (
-    <aside className="flex h-full w-[240px] shrink-0 flex-col border-l border-gray-200 bg-white">
-      {/* Header: panel controls + Preview */}
-      <div className="flex items-center gap-1 border-b border-gray-200 px-3 py-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400">
-          <PanelRight size={16} />
-        </span>
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400">
-          <Download size={16} />
-        </span>
-        <button
-          type="button"
-          onClick={() => navigate("/present")}
-          className="ml-auto flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
-        >
-          <Play size={14} />
-          Preview
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 px-3 py-2">
-        <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">
-          Properties
-        </span>
-        <span className="px-3 py-1 text-xs font-medium text-gray-400">Animation</span>
-      </div>
-
+    <aside
+      aria-label="Inspector"
+      className="flex h-full w-[240px] shrink-0 flex-col border-l border-gray-200 bg-white"
+    >
       <div className="flex-1 overflow-y-auto">
         {selected ? (
           <>
             <InspectorSection title="Object">
-              <div className="flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                  {SelectedIcon ? <SelectedIcon size={15} className="text-gray-500" /> : null}
+                  {SelectedIcon ? (
+                    <SelectedIcon size={15} className="text-gray-500" />
+                  ) : null}
                   {OBJECT_TYPE_LABELS[selected.type]}
                 </span>
-                <span className="font-mono text-[10px] text-gray-400">
-                  {selected.id.slice(0, 10)}
-                </span>
+                {locked ? (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+                    Locked
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex gap-1.5">
+                <IconToggleButton
+                  title={locked ? "Unlock" : "Lock"}
+                  pressed={locked}
+                  onClick={() => updateObject(selected.id, { locked: !locked })}
+                >
+                  {locked ? <Lock size={14} /> : <LockOpen size={14} />}
+                </IconToggleButton>
+                <IconToggleButton
+                  title={selected.hidden ? "Show" : "Hide"}
+                  pressed={Boolean(selected.hidden)}
+                  onClick={() =>
+                    updateObject(selected.id, { hidden: !selected.hidden })
+                  }
+                >
+                  {selected.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                </IconToggleButton>
+                <IconToggleButton
+                  title="Duplicate (⌘D)"
+                  onClick={() => duplicateObject(selected.id)}
+                >
+                  <Copy size={14} />
+                </IconToggleButton>
+                <IconToggleButton
+                  title="Delete (⌫)"
+                  danger
+                  onClick={() => deleteObjects([selected.id])}
+                >
+                  <Trash2 size={14} />
+                </IconToggleButton>
               </div>
             </InspectorSection>
 
@@ -94,33 +115,42 @@ export function Inspector() {
 
             <InspectorSection title="Order">
               <div className="flex gap-1.5">
-                <InspectorButton onClick={() => bringForward(selected.id)} title="Bring forward">
+                <InspectorButton
+                  onClick={() => bringForward(selected.id)}
+                  title="Bring forward (⌘])"
+                >
                   <ArrowUp size={14} />
                 </InspectorButton>
-                <InspectorButton onClick={() => sendBackward(selected.id)} title="Send backward">
+                <InspectorButton
+                  onClick={() => sendBackward(selected.id)}
+                  title="Send backward (⌘[)"
+                >
                   <ArrowDown size={14} />
                 </InspectorButton>
-                <InspectorButton onClick={() => bringToFront(selected.id)} title="Bring to front">
+                <InspectorButton
+                  onClick={() => bringToFront(selected.id)}
+                  title="Bring to front"
+                >
                   <ArrowUpToLine size={14} />
                 </InspectorButton>
-                <InspectorButton onClick={() => sendToBack(selected.id)} title="Send to back">
+                <InspectorButton
+                  onClick={() => sendToBack(selected.id)}
+                  title="Send to back"
+                >
                   <ArrowDownToLine size={14} />
                 </InspectorButton>
               </div>
             </InspectorSection>
 
             <LayersPanel />
-
-            <InspectorSection title="Danger">
-              <InspectorButton variant="danger" onClick={() => deleteObjects([selected.id])}>
-                <Trash2 size={14} /> Delete object
-              </InspectorButton>
-            </InspectorSection>
           </>
         ) : selectedIds.length > 1 ? (
           <>
             <InspectorSection title={`${selectedIds.length} objects selected`}>
-              <InspectorButton variant="danger" onClick={() => deleteObjects(selectedIds)}>
+              <InspectorButton
+                variant="danger"
+                onClick={() => deleteObjects(selectedIds)}
+              >
                 <Trash2 size={14} /> Delete selection
               </InspectorButton>
             </InspectorSection>
@@ -133,7 +163,11 @@ export function Inspector() {
                 <TextInput
                   value={activeSlide.title ?? ""}
                   placeholder="Slide title"
-                  onChange={(title) => updateSlide(activeSlide.id, { title })}
+                  onFocus={beginSession}
+                  onBlur={endSession}
+                  onChange={(title) =>
+                    live((doc) => cmdUpdateSlide(doc, activeSlide.id, { title }))
+                  }
                 />
               </FieldRow>
             </InspectorSection>
@@ -143,7 +177,11 @@ export function Inspector() {
                 value={activeSlide.notes ?? ""}
                 rows={5}
                 placeholder="Notes shown to the presenter…"
-                onChange={(notes) => updateSlide(activeSlide.id, { notes })}
+                onFocus={beginSession}
+                onBlur={endSession}
+                onChange={(notes) =>
+                  live((doc) => cmdUpdateSlide(doc, activeSlide.id, { notes }))
+                }
               />
             </InspectorSection>
 
@@ -151,9 +189,10 @@ export function Inspector() {
               <FieldRow label="Color">
                 <input
                   type="color"
+                  aria-label="Slide background color"
                   value={activeSlide.background?.color ?? "#ffffff"}
                   onChange={(e) =>
-                    updateSlide(activeSlide.id, {
+                    useEditorStore.getState().updateSlide(activeSlide.id, {
                       background: { type: "color", color: e.target.value },
                     })
                   }
@@ -163,9 +202,11 @@ export function Inspector() {
               <button
                 type="button"
                 onClick={() =>
-                  updateSlide(activeSlide.id, { background: { type: "none" } })
+                  useEditorStore.getState().updateSlide(activeSlide.id, {
+                    background: { type: "none" },
+                  })
                 }
-                className="mt-1 text-[11px] text-gray-400 hover:text-gray-700"
+                className="mt-1 text-[11px] text-gray-400 transition-colors hover:text-gray-700"
               >
                 Reset to theme default
               </button>

@@ -24,17 +24,19 @@ function mapToCodeExecution(response: ExecuteResponse): CodeExecution {
   };
 }
 
-/** Encapsulates running a code object against the execution service. */
+/**
+ * Encapsulates running a code object against the execution service. The
+ * callback identity is stable per object and always executes the *latest*
+ * source from the store (never a stale closure).
+ */
 export function useRunCode(object: CodeObject) {
   const setCodeExecution = useEditorStore((s) => s.setCodeExecution);
   const running = object.execution?.status === "running";
 
   const run = useCallback(async () => {
-    if (useEditorStore.getState().document.objects[object.id]?.type !== "code") return;
     const current = useEditorStore.getState().document.objects[object.id];
-    if (current && current.type === "code" && current.execution?.status === "running") {
-      return;
-    }
+    if (!current || current.type !== "code") return;
+    if (current.execution?.status === "running") return;
     setCodeExecution(object.id, {
       executionId: "",
       status: "running",
@@ -42,9 +44,9 @@ export function useRunCode(object: CodeObject) {
       stderr: "",
       artifacts: [],
     });
-    const { response } = await executePython(object.source, 15);
+    const { response } = await executePython(current.source, 15);
     setCodeExecution(object.id, mapToCodeExecution(response));
-  }, [object.id, object.source, setCodeExecution]);
+  }, [object.id, setCodeExecution]);
 
   return { run, running };
 }

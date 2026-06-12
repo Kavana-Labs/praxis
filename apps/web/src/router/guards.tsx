@@ -1,6 +1,6 @@
 import type { FC } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "@/auth/auth-context";
+import { useAuth } from "@/auth/use-auth";
 import { ROUTES } from "./paths";
 
 export const AuthGuard = () => {

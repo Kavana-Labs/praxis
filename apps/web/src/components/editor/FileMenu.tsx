@@ -16,30 +16,44 @@ export function FileMenu() {
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const newDocument = useEditorStore((s) => s.newDocument);
   const loadDocument = useEditorStore((s) => s.loadDocument);
 
   const item =
-    "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100";
+    "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none";
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
       >
         File
         <ChevronDown size={13} />
       </button>
       {open ? (
-        <div className="absolute left-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div
+          role="menu"
+          aria-label="File"
+          className="absolute left-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg animate-in fade-in zoom-in-95 duration-100"
+        >
           <button
             type="button"
+            role="menuitem"
             className={item}
             onClick={() => {
               newDocument("Untitled presentation");
@@ -50,6 +64,7 @@ export function FileMenu() {
           </button>
           <button
             type="button"
+            role="menuitem"
             className={item}
             onClick={() => {
               loadDocument(createHarmonicMotionDeck({ freshId: true }), {

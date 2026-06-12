@@ -1,24 +1,29 @@
 import { useEffect } from "react";
 import { useEditorStore } from "@/stores/editor-store";
+import { saveNow } from "./usePersistence";
 
 /**
  * Editor-wide keyboard shortcuts. Forwards user intent to the command layer;
  * it never mutates the document directly.
  *
- *   Cmd/Ctrl+Z         undo
- *   Cmd/Ctrl+Shift+Z   redo  (also Ctrl+Y)
- *   Delete / Backspace delete selected objects
- *   Cmd/Ctrl+D         duplicate selected object
- *   Cmd/Ctrl+] / [     bring forward / send backward
- *   Arrows             nudge selected object (Shift = larger step)
- *   Escape             clear selection
+ *   Cmd/Ctrl+Z          undo            (document — never while typing)
+ *   Cmd/Ctrl+Shift+Z    redo            (also Ctrl+Y)
+ *   Cmd/Ctrl+S          save now
+ *   Cmd/Ctrl+C / V      copy / paste selected objects
+ *   Cmd/Ctrl+D          duplicate selected object
+ *   Cmd/Ctrl+] / [      bring forward / send backward
+ *   Delete / Backspace  delete selected objects
+ *   Arrows              nudge by 1 (Shift = 10) logical units
+ *   Escape              editing → selected → deselected
  *
- * Shortcuts are suppressed while the user is typing in an input, textarea, or
- * contenteditable surface (e.g. the rich-text or code editors).
+ * While the user is typing (inputs, textareas, contenteditable — including the
+ * Tiptap and CodeMirror editors) every document shortcut is suppressed so the
+ * focused editor keeps its own keyboard behavior, including its own undo
+ * history. Handlers also respect `defaultPrevented` set by nested editors.
  */
 
-const NUDGE = 8;
-const NUDGE_LARGE = 40;
+const NUDGE = 1;
+const NUDGE_LARGE = 10;
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -37,20 +42,45 @@ export function useEditorHotkeys(enabled = true): void {
     if (!enabled) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return; // a nested editor already handled it
       const store = useEditorStore.getState();
       const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
       const typing = isTypingTarget(e.target);
+      const editing = store.editingObjectId !== null;
 
-      // Undo / redo work even mid-typing only when the modifier is held.
-      if (mod && e.key.toLowerCase() === "z") {
+      // Explicit save always works, even mid-typing.
+      if (mod && key === "s") {
         e.preventDefault();
-        if (e.shiftKey) store.redo();
+        void saveNow();
+        return;
+      }
+
+      // Document undo/redo — but never while typing or inline-editing:
+      // Tiptap/CodeMirror own their undo stacks during an editing session, and
+      // rewinding the document mid-session would corrupt the session snapshot.
+      if (mod && (key === "z" || key === "y")) {
+        if (typing || editing) return;
+        e.preventDefault();
+        if (key === "y" || e.shiftKey) store.redo();
         else store.undo();
         return;
       }
-      if (mod && e.key.toLowerCase() === "y") {
-        e.preventDefault();
-        store.redo();
+
+      if (e.key === "Escape") {
+        // One level at a time: editing → selected → deselected.
+        if (editing) {
+          e.preventDefault();
+          store.setEditingObject(null);
+          return;
+        }
+        if (typing) {
+          (e.target as HTMLElement).blur?.();
+          return;
+        }
+        if (store.selectedObjectIds.length > 0) {
+          store.clearSelection();
+        }
         return;
       }
 
@@ -66,10 +96,25 @@ export function useEditorHotkeys(enabled = true): void {
         return;
       }
 
-      if (mod && e.key.toLowerCase() === "d") {
+      if (mod && key === "d") {
         if (selected.length === 1) {
           e.preventDefault();
           store.duplicateObject(selected[0]);
+        }
+        return;
+      }
+
+      if (mod && key === "c") {
+        if (selected.length > 0 && store.copySelection()) {
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if (mod && key === "v") {
+        if (store.clipboard) {
+          e.preventDefault();
+          store.pasteClipboard();
         }
         return;
       }
@@ -83,13 +128,8 @@ export function useEditorHotkeys(enabled = true): void {
         return;
       }
 
-      if (e.key === "Escape") {
-        if (selected.length > 0) store.clearSelection();
-        return;
-      }
-
       if (
-        selected.length === 1 &&
+        selected.length > 0 &&
         (e.key === "ArrowUp" ||
           e.key === "ArrowDown" ||
           e.key === "ArrowLeft" ||
@@ -97,16 +137,11 @@ export function useEditorHotkeys(enabled = true): void {
       ) {
         e.preventDefault();
         const step = e.shiftKey ? NUDGE_LARGE : NUDGE;
-        const obj = store.document.objects[selected[0]];
-        if (!obj) return;
-        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
-        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        store.moveObject(selected[0], {
-          x: obj.x + dx,
-          y: obj.y + dy,
-          width: obj.width,
-          height: obj.height,
-        });
+        const dx =
+          e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy =
+          e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        store.nudgeSelected(dx, dy);
       }
     };
 

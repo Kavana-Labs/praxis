@@ -1,10 +1,14 @@
 import { Quote } from "lucide-react";
 import type { CitationObject } from "@/domain/types";
 import { citationLink, formatCitationCompact } from "@/lib/citation";
+import { useEditorStore } from "@/stores/editor-store";
 import type { ObjectViewProps } from "./types";
 
 export function CitationObjectView({ object, document, theme }: ObjectViewProps<CitationObject>) {
-  const record = document.citations[object.citationId];
+  const storeRecord = useEditorStore(
+    (s) => s.document.citations[object.citationId],
+  );
+  const record = document ? document.citations[object.citationId] : storeRecord;
 
   if (!record) {
     return (

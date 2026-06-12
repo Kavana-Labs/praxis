@@ -5,8 +5,6 @@ import {
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AlignEdge } from "@/domain/commands";
@@ -29,13 +27,14 @@ const ALIGN_BUTTONS: { edge: AlignEdge; icon: LucideIcon; title: string }[] = [
   { edge: "bottom", icon: AlignVerticalJustifyEnd, title: "Align bottom" },
 ];
 
-/** Generic, type-agnostic object properties matching the Platform Figma inspector. */
+/** Generic, type-agnostic object properties (geometry + appearance). */
 export function ObjectProperties({ object }: { object: PraxisObject }) {
   const moveObject = useEditorStore((s) => s.moveObject);
   const resizeObject = useEditorStore((s) => s.resizeObject);
   const updateObject = useEditorStore((s) => s.updateObject);
   const alignObject = useEditorStore((s) => s.alignObject);
 
+  const locked = Boolean(object.locked);
   const bounds = {
     x: object.x,
     y: object.y,
@@ -52,8 +51,10 @@ export function ObjectProperties({ object }: { object: PraxisObject }) {
               key={edge}
               type="button"
               title={title}
+              aria-label={title}
+              disabled={locked}
               onClick={() => alignObject(object.id, edge)}
-              className={`flex h-8 flex-1 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-100 ${
+              className={`flex h-8 flex-1 items-center justify-center rounded-md border border-gray-200 text-gray-600 transition-colors hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-40 ${
                 i === 2 ? "mr-1.5" : ""
               }`}
             >
@@ -65,54 +66,70 @@ export function ObjectProperties({ object }: { object: PraxisObject }) {
 
       <InspectorSection title="Position">
         <div className="grid grid-cols-3 gap-2">
-          <FieldRow label="X">
-            <NumberInput value={object.x} onChange={(x) => moveObject(object.id, { ...bounds, x })} />
-          </FieldRow>
-          <FieldRow label="Y">
-            <NumberInput value={object.y} onChange={(y) => moveObject(object.id, { ...bounds, y })} />
-          </FieldRow>
-          <FieldRow label="⟳">
+          <FieldRow label="X" compact>
             <NumberInput
+              label="X position"
+              value={object.x}
+              disabled={locked}
+              onChange={(x) => moveObject(object.id, { ...bounds, x })}
+            />
+          </FieldRow>
+          <FieldRow label="Y" compact>
+            <NumberInput
+              label="Y position"
+              value={object.y}
+              disabled={locked}
+              onChange={(y) => moveObject(object.id, { ...bounds, y })}
+            />
+          </FieldRow>
+          <FieldRow label="⟳" compact>
+            <NumberInput
+              label="Rotation in degrees"
               value={object.rotation ?? 0}
               min={-180}
               max={180}
+              disabled={locked}
               onChange={(rotation) => updateObject(object.id, { rotation })}
             />
           </FieldRow>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <FieldRow label="W">
-            <NumberInput value={object.width} onChange={(width) => resizeObject(object.id, { ...bounds, width })} />
+          <FieldRow label="W" compact>
+            <NumberInput
+              label="Width"
+              value={object.width}
+              min={1}
+              disabled={locked}
+              onChange={(width) => resizeObject(object.id, { ...bounds, width })}
+            />
           </FieldRow>
-          <FieldRow label="H">
-            <NumberInput value={object.height} onChange={(height) => resizeObject(object.id, { ...bounds, height })} />
+          <FieldRow label="H" compact>
+            <NumberInput
+              label="Height"
+              value={object.height}
+              min={1}
+              disabled={locked}
+              onChange={(height) => resizeObject(object.id, { ...bounds, height })}
+            />
           </FieldRow>
         </div>
       </InspectorSection>
 
       <InspectorSection title="Appearance">
         <FieldRow label="Opacity">
-          <div className="flex w-full items-center gap-2">
-            <NumberInput
-              value={Math.round((object.opacity ?? 1) * 100)}
-              min={0}
-              max={100}
-              onChange={(v) => updateObject(object.id, { opacity: clamp01(v / 100) })}
-            />
-            <button
-              type="button"
-              title={object.hidden ? "Show" : "Hide"}
-              onClick={() => updateObject(object.id, { hidden: !object.hidden })}
-              className="flex h-7 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-100"
-            >
-              {object.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
+          <NumberInput
+            label="Opacity percent"
+            value={Math.round((object.opacity ?? 1) * 100)}
+            min={0}
+            max={100}
+            onChange={(v) => updateObject(object.id, { opacity: clamp01(v / 100) })}
+          />
         </FieldRow>
 
         <FieldRow label="Fill">
           <div className="flex w-full items-center gap-2">
             <ColorField
+              label="Fill color"
               value={object.fill ?? "#ffffff"}
               onChange={(fill) => updateObject(object.id, { fill })}
             />
@@ -121,7 +138,7 @@ export function ObjectProperties({ object }: { object: PraxisObject }) {
                 type="button"
                 title="Clear fill"
                 onClick={() => updateObject(object.id, { fill: undefined })}
-                className="shrink-0 text-[11px] text-gray-400 hover:text-gray-700"
+                className="shrink-0 text-[11px] text-gray-400 transition-colors hover:text-gray-700"
               >
                 Clear
               </button>
@@ -132,16 +149,21 @@ export function ObjectProperties({ object }: { object: PraxisObject }) {
         <FieldRow label="Border">
           <div className="flex w-full items-center gap-2">
             <NumberInput
+              label="Border width"
               value={object.border?.width ?? 0}
               min={0}
               max={40}
               onChange={(width) =>
                 updateObject(object.id, {
-                  border: width > 0 ? { width, color: object.border?.color ?? "#1f2937" } : undefined,
+                  border:
+                    width > 0
+                      ? { width, color: object.border?.color ?? "#1f2937" }
+                      : undefined,
                 })
               }
             />
             <ColorField
+              label="Border color"
               value={object.border?.color ?? "#1f2937"}
               onChange={(color) =>
                 updateObject(object.id, {
@@ -154,6 +176,7 @@ export function ObjectProperties({ object }: { object: PraxisObject }) {
 
         <FieldRow label="Radius">
           <NumberInput
+            label="Corner radius"
             value={object.radius ?? 0}
             min={0}
             max={400}

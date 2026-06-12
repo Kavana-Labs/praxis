@@ -18,6 +18,25 @@ export const SLIDE_ASPECT = SLIDE_WIDTH / SLIDE_HEIGHT;
 export const MIN_OBJECT_WIDTH = 48;
 export const MIN_OBJECT_HEIGHT = 32;
 
+/**
+ * Per-type minimum sizes (logical units). The registry consults this so each
+ * object type stays usable at its smallest: code cells keep room for a line of
+ * source, dividers can collapse to a thin rule, etc. Types not listed fall back
+ * to MIN_OBJECT_WIDTH / MIN_OBJECT_HEIGHT.
+ */
+export const MIN_OBJECT_SIZE: Partial<
+  Record<string, { width: number; height: number }>
+> = {
+  text: { width: 120, height: 48 },
+  heading: { width: 160, height: 48 },
+  math: { width: 96, height: 48 },
+  code: { width: 280, height: 140 },
+  image: { width: 64, height: 64 },
+  citation: { width: 240, height: 80 },
+  artifact: { width: 96, height: 80 },
+  shape: { width: 24, height: 16 },
+};
+
 /** Default sizes per object type when inserted (logical units). */
 export const DEFAULT_OBJECT_SIZE = {
   text: { width: 640, height: 200 },
