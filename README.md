@@ -31,6 +31,11 @@ rewrite.
 - **Local autosave** (localStorage) + **versioned JSON import/export** with graceful failure.
 - **Present Mode** — a dedicated full-screen renderer with keyboard navigation.
 - **Seeded example deck** — *Modeling Harmonic Motion*.
+- **Presentation import** — upload PowerPoint `.pptx` files or pick a Google
+  Slides presentation (exported to `.pptx` server-side by Google, parsed by the
+  same importer). Supported content becomes editable Praxis objects; the rest
+  gets clear fallbacks and a per-slide import report. See
+  [`docs/presentation-import.md`](docs/presentation-import.md).
 
 ---
 
@@ -86,6 +91,11 @@ npm run dev          # http://localhost:5173  → open /editor
 ```
 
 The editor seeds the *Modeling Harmonic Motion* deck on first run and autosaves locally.
+
+> **Google Slides import (optional):** create `apps/web/.env.local` with
+> `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_API_KEY`, and optionally
+> `VITE_GOOGLE_APP_ID` (see [`docs/presentation-import.md`](docs/presentation-import.md)).
+> Without them the editor simply shows the option as not configured.
 
 ### 2. Execution service (Python sandbox)
 
@@ -161,6 +171,9 @@ separately.)
 - Images and artifacts are stored inline as data URLs (behind an asset abstraction for a future
   object-storage backend).
 - The `subprocess` execution backend is best-effort and not a true sandbox.
+- Presentation import targets common content: charts/SmartArt/tables become
+  fallbacks with warnings, `.ppt` is not supported, and Google Slides decks over
+  Drive's export limit must be uploaded as `.pptx` manually.
 - No PDF/PPTX export, no bibliography manager, no AI generation (out of MVP scope).
 
 ---

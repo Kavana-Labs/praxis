@@ -33,7 +33,7 @@ test("present mode shows a clean projection without editor chrome", async ({
     return id;
   });
 
-  await page.getByRole("button", { name: "Present" }).click();
+  await page.getByRole("button", { name: "Present", exact: true }).click();
   await expect(page).toHaveURL(/\/present/);
 
   // No editor chrome leaks into the projection.

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Download,
   House,
+  MonitorUp,
   PanelLeft,
   PanelRight,
   Play,
@@ -193,6 +194,13 @@ export function EditorTopBar({
 
         <div className="mx-1 hidden h-6 w-px bg-gray-200 md:block" />
 
+        <IconButton
+          onClick={() => useUiStore.getState().openImportModal()}
+          title="Import presentation (PowerPoint or Google Slides)"
+          className="hidden md:flex"
+        >
+          <MonitorUp size={17} />
+        </IconButton>
         <IconButton onClick={onImport} title="Import JSON" className="hidden md:flex">
           <Upload size={17} />
         </IconButton>

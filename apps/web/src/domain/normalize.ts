@@ -1,4 +1,4 @@
-import { clampBounds } from "./geometry";
+import { clampBounds, minSizeForType } from "./geometry";
 import type { PraxisDocument, PraxisObject, SlideContainer } from "./types";
 
 /**
@@ -47,12 +47,15 @@ export function normalizeDocument(input: PraxisDocument): PraxisDocument {
   // 3. Clamp geometry and soften dangling asset/citation references.
   for (const id of Object.keys(objects)) {
     const obj = objects[id];
-    const clamped = clampBounds({
-      x: obj.x,
-      y: obj.y,
-      width: obj.width,
-      height: obj.height,
-    });
+    const clamped = clampBounds(
+      {
+        x: obj.x,
+        y: obj.y,
+        width: obj.width,
+        height: obj.height,
+      },
+      minSizeForType(obj.type),
+    );
     let next: PraxisObject = {
       ...obj,
       x: clamped.x,

@@ -320,6 +320,26 @@ export function SlideCanvas() {
               <div style={{ fontSize: 18 }}>
                 Insert an object from the toolbar below to begin.
               </div>
+              <button
+                type="button"
+                onClick={() => useUiStore.getState().openImportModal()}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{
+                  pointerEvents: "auto",
+                  marginTop: 10,
+                  padding: "10px 18px",
+                  borderRadius: 10,
+                  border: "1.5px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#475569",
+                  fontFamily: theme.fontBody,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Import an existing presentation…
+              </button>
             </div>
           ) : null}
           {objectIds.map((id) => (
