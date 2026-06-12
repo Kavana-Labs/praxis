@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, X } from "lucide-react";
 import { persistence } from "@/services/persistence";
 import { useEditorStore } from "@/stores/editor-store";
@@ -53,6 +54,8 @@ function formatBytes(bytes: number): string {
 export function ImportPresentationModal() {
   const open = useUiStore((s) => s.importModalOpen);
   const close = useUiStore((s) => s.closeImportModal);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [phase, setPhase] = useState<Phase>({ name: "choose" });
   const [notice, setNotice] = useState<Notice>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -139,6 +142,10 @@ export function ImportPresentationModal() {
       }
     }
     close();
+    // Opened from the dashboard (or anywhere else): move to the editor.
+    if (!location.pathname.startsWith("/editor")) {
+      navigate("/editor");
+    }
   };
 
   const discard = async (result: ImportResultOk) => {
