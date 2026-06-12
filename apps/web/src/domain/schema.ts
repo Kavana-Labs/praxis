@@ -224,10 +224,42 @@ export const themeSchema = z.object({
   fontMono: z.string().default("'JetBrains Mono', 'Fira Code', monospace"),
 });
 
+/**
+ * Import provenance + report, stored on documents created by the
+ * presentation importer. Everything is optional and additive, so existing
+ * documents validate unchanged and the report travels with exports.
+ */
+export const importWarningSchema = z.object({
+  slideNumber: z.number().int().min(0),
+  elementType: z.string(),
+  severity: z.enum(["info", "warning", "error"]),
+  message: z.string(),
+  fallback: z.string(),
+  actionRecommended: z.boolean(),
+});
+
+export const importReportSchema = z.object({
+  summary: z.object({
+    title: z.string(),
+    sourceType: z.enum(["pptx", "google-slides"]),
+    slidesImported: z.number().int().min(0),
+    editableElementsConverted: z.number().int().min(0),
+    imagesExtracted: z.number().int().min(0),
+    elementsWithWarnings: z.number().int().min(0),
+    unsupportedElements: z.number().int().min(0),
+    warningCount: z.number().int().min(0),
+  }),
+  items: z.array(importWarningSchema),
+});
+
 export const documentMetadataSchema = z.object({
   author: z.string().optional(),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  importedFrom: z.enum(["pptx", "google-slides"]).optional(),
+  importedAt: isoDate.optional(),
+  originalFilename: z.string().optional(),
+  importReport: importReportSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------
