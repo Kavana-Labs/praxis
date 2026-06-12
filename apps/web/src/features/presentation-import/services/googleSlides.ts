@@ -84,6 +84,8 @@ type PickerBuilder = {
   setOAuthToken: (token: string) => PickerBuilder;
   setDeveloperKey: (key: string) => PickerBuilder;
   setAppId: (appId: string) => PickerBuilder;
+  setOrigin: (origin: string) => PickerBuilder;
+  setSelectableMimeTypes: (mimeTypes: string) => PickerBuilder;
   setTitle: (title: string) => PickerBuilder;
   enableFeature: (feature: string) => PickerBuilder;
   setCallback: (
@@ -217,6 +219,11 @@ export async function pickSlidesPresentation(
       .addView(picker.ViewId.PRESENTATIONS)
       .setOAuthToken(accessToken)
       .setDeveloperKey(config.apiKey)
+      // Without an explicit origin the Picker can fall back to a separate
+      // tab whose postMessage results never reach the app — the selection
+      // callback silently never fires. Always anchor it to this origin.
+      .setOrigin(window.location.origin)
+      .setSelectableMimeTypes("application/vnd.google-apps.presentation")
       .setTitle("Choose a Google Slides presentation")
       .enableFeature(picker.Feature.NAV_HIDDEN)
       .setCallback((data) => {
