@@ -36,7 +36,10 @@ export function GoogleSlidesImport({
       const token = await requestAccessToken();
       const pick = await pickSlidesPresentation(token);
       if (!pick) {
-        onNotice("Google Drive connection was cancelled. No files were imported.", "info");
+        onNotice(
+          "No presentation was selected. If the picker asked you to sign in: sign in, close it, and choose Import from Google Slides again — it picks up the new session on reopen. If it keeps asking, your browser is blocking third-party cookies for google.com; allow them, or download the deck as a .pptx from Google Slides and upload it here instead.",
+          "info",
+        );
         return;
       }
       onPicked(pick, token);
