@@ -4,23 +4,21 @@ import { cn } from "@/lib/utils";
 import {
   GoogleCancelledError,
   isGoogleImportConfigured,
-  pickSlidesPresentation,
   requestAccessToken,
-  type PickedSlides,
 } from "../services/googleSlides";
 import { ImportError } from "../types";
 
 /**
- * The "Import from Google Slides" option: connect (token), pick one
- * presentation, hand the selection to the modal. Read-only `drive.file`
- * scope — Praxis can only read what the user explicitly selects.
+ * The "Import from Google Slides" option: requests a read-only Drive token,
+ * then hands off to the in-modal Praxis Drive browser. No Google iframe is
+ * involved anywhere in the flow.
  */
 export function GoogleSlidesImport({
-  onPicked,
+  onConnected,
   onNotice,
   disabled,
 }: {
-  onPicked: (pick: PickedSlides, accessToken: string) => void;
+  onConnected: (accessToken: string) => void;
   /** Cancellations and errors surface as calm notices in the modal. */
   onNotice: (message: string, kind: "info" | "error") => void;
   disabled?: boolean;
@@ -34,22 +32,14 @@ export function GoogleSlidesImport({
     setBusy(true);
     try {
       const token = await requestAccessToken();
-      const pick = await pickSlidesPresentation(token);
-      if (!pick) {
-        onNotice(
-          "No presentation was selected. If the picker asked you to sign in: sign in, close it, and choose Import from Google Slides again — it picks up the new session on reopen. If it keeps asking, your browser is blocking third-party cookies for google.com; allow them, or download the deck as a .pptx from Google Slides and upload it here instead.",
-          "info",
-        );
-        return;
-      }
-      onPicked(pick, token);
+      onConnected(token);
     } catch (err) {
       if (err instanceof GoogleCancelledError) {
         onNotice(err.message, "info");
       } else if (err instanceof ImportError) {
         onNotice(err.message, "error");
       } else {
-        console.error("Google Slides selection failed", err);
+        console.error("Google Drive connection failed", err);
         onNotice(
           "Google Drive could not be reached. Check your connection and try again.",
           "error",

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   exportSlidesAsPptx,
+  GoogleAuthExpiredError,
   importFromGoogleSlides,
   isGoogleImportConfigured,
+  listSlidesPresentations,
   requestAccessToken,
 } from "../services/googleSlides";
 import { sampleDeck } from "./fixtures";
@@ -124,5 +126,76 @@ describe("importFromGoogleSlides (shared pipeline)", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected failure");
     expect(result.error).toMatch(/could not export/i);
+  });
+});
+
+describe("listSlidesPresentations (Praxis Drive browser)", () => {
+  it("queries Slides files with recency ordering and maps the result", async () => {
+    mockFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            nextPageToken: "page2",
+            files: [
+              {
+                id: "f1",
+                name: "Wave Optics",
+                modifiedTime: "2026-06-01T10:00:00Z",
+                owners: [{ displayName: "Desmond" }],
+                thumbnailLink: "https://lh3.example/thumb",
+              },
+              { id: "f2" }, // minimal file
+              { name: "no-id-dropped" },
+            ],
+          }),
+          { status: 200 },
+        ),
+    );
+    const page = await listSlidesPresentations("token");
+    const url = String(vi.mocked(globalThis.fetch).mock.calls[0][0]);
+    const readable = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(url).toContain("drive/v3/files");
+    expect(readable).toContain(
+      "mimeType = 'application/vnd.google-apps.presentation'",
+    );
+    expect(readable).toContain("trashed = false");
+    expect(readable).toContain("viewedByMeTime desc");
+    expect(page.nextPageToken).toBe("page2");
+    expect(page.files).toHaveLength(2);
+    expect(page.files[0]).toMatchObject({
+      id: "f1",
+      name: "Wave Optics",
+      owner: "Desmond",
+    });
+    expect(page.files[1].name).toBe("Untitled presentation");
+  });
+
+  it("escapes quotes in search terms and passes page tokens", async () => {
+    mockFetch(() => new Response(JSON.stringify({ files: [] }), { status: 200 }));
+    await listSlidesPresentations("token", {
+      query: "Frank's 'deck'",
+      pageToken: "tok123",
+    });
+    const url = decodeURIComponent(
+      String(vi.mocked(globalThis.fetch).mock.calls[0][0]),
+    ).replace(/\+/g, " ");
+    expect(url).toContain("name contains 'Frank\\'s \\'deck\\''".replace(/\\\\/g, "\\"));
+    expect(url).toContain("pageToken=tok123");
+  });
+
+  it("maps 401 to GoogleAuthExpiredError for the reconnect flow", async () => {
+    mockFetch(() => new Response("{}", { status: 401 }));
+    await expect(listSlidesPresentations("expired")).rejects.toBeInstanceOf(
+      GoogleAuthExpiredError,
+    );
+  });
+
+  it("maps network failure to a calm unreachable message", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.reject(new Error("offline")),
+    ) as unknown as typeof fetch;
+    await expect(listSlidesPresentations("t")).rejects.toThrow(
+      /could not be reached/i,
+    );
   });
 });
