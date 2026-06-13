@@ -25,45 +25,50 @@ export function AuthLayout({
   below?: ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#fbfaff] px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f3f7] px-4 py-10">
+      {/* Formula texture, cover-scaled so equations read large like the design;
+          multiply drops the source white and leaves soft gray formulas. */}
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.55]"
+        className="absolute inset-0 opacity-[0.6] [mix-blend-mode:multiply]"
         style={{
           backgroundImage: `url(${mathBackground})`,
-          backgroundSize: "1200px",
-          backgroundRepeat: "repeat",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       />
+      {/* Violet glow — Figma "Ellipse 6" (578px), centred just off the top-right. */}
       <div
         aria-hidden
-        className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-[#ddd1fb]/70 to-transparent"
-      />
-      <div
-        aria-hidden
-        className="absolute -top-[258px] right-[-90px] h-[578px] w-[578px] rounded-full bg-[#652ff3]/25 blur-3xl"
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(680px 680px at calc(100% - 30px) 24px, rgba(124,77,243,0.38) 0%, rgba(124,77,243,0.14) 40%, rgba(124,77,243,0) 70%)",
+        }}
       />
 
       <div className="relative w-full max-w-[460px]">
-        <div className="flex flex-col items-center gap-6 rounded-t-2xl border border-gray-200 bg-white p-8 shadow-[0_12px_7.5px_rgba(75,85,99,0.03),0_4px_4px_rgba(75,85,99,0.04)]">
-          <img src={praxisGlyph} alt="Praxis" className="h-10 w-[50px]" />
-          <div className="flex w-full flex-col items-center gap-3">
-            <h1 className="text-center text-[32px] font-bold leading-tight text-gray-800">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p className="max-w-[394px] text-center text-base leading-snug text-gray-800">
-                {subtitle}
-              </p>
-            ) : null}
+        <div className="overflow-hidden rounded-2xl border border-[#e5e7eb] shadow-[0_60px_12px_rgba(75,85,99,0.01),0_34px_10px_rgba(75,85,99,0.02),0_12px_7.5px_rgba(75,85,99,0.03),0_4px_4px_rgba(75,85,99,0.04)]">
+          <div className="flex flex-col items-center gap-6 bg-white p-8">
+            <img src={praxisGlyph} alt="Praxis" className="h-10 w-[50px]" />
+            <div className="flex w-full flex-col items-center gap-8">
+              <h1 className="text-center text-[32px] font-bold leading-tight text-[#1f2937]">
+                {title}
+              </h1>
+              {subtitle ? (
+                <p className="max-w-[394px] text-center text-base leading-snug text-[#1f2937]">
+                  {subtitle}
+                </p>
+              ) : null}
+              {children}
+            </div>
           </div>
-          {children}
-        </div>
-        <div className="flex h-14 items-center justify-center rounded-b-2xl border-x border-b border-gray-200 bg-[#fbfaff] px-2">
-          <p className="text-center text-xs font-medium text-[#6b7880]">
-            LaTeX-native&ensp;•&ensp;Academic-ready exports&ensp;•&ensp;Built for
-            scientists &amp; engineers
-          </p>
+          <div className="flex h-14 items-center justify-center border-t border-[#eceaf3] bg-[#fbfaff] px-2">
+            <p className="text-center text-xs font-medium text-[#6b7880]">
+              LaTeX-native&ensp;•&ensp;Academic-ready exports&ensp;•&ensp;Built for
+              scientists &amp; engineers
+            </p>
+          </div>
         </div>
         {below ? <div className="mt-6 text-center">{below}</div> : null}
       </div>
