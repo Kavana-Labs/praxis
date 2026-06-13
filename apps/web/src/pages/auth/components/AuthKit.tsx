@@ -1,7 +1,8 @@
 import { useId, useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { CircleAlert, CircleCheck, Eye, EyeOff, Loader2 } from "lucide-react";
-import mathBackground from "@/assets/math_background.png";
+import authFormulaBg from "@/assets/auth/auth-formula-bg.png";
+import authGlow from "@/assets/auth/auth-glow.svg";
 import praxisGlyph from "@/assets/auth/praxis-glyph.svg";
 import googleLogo from "@/assets/auth/google-logo.svg";
 import { cn } from "@/lib/utils";
@@ -25,26 +26,29 @@ export function AuthLayout({
   below?: ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f3f7] px-4 py-10">
-      {/* Formula texture, cover-scaled so equations read large like the design;
-          multiply drops the source white and leaves soft gray formulas. */}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f3f4f6] px-4 py-10">
+      {/* Formula texture (the design's own asset). Multiply drops the source
+          white so only the equations darken the gray base — matching the
+          two stacked formula layers in the Figma frame. */}
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.6] [mix-blend-mode:multiply]"
+        className="absolute inset-0 opacity-[0.18] [mix-blend-mode:multiply]"
         style={{
-          backgroundImage: `url(${mathBackground})`,
-          backgroundSize: "cover",
+          backgroundImage: `url(${authFormulaBg})`,
+          backgroundSize: "126%",
           backgroundPosition: "center",
+          backgroundRepeat: "repeat",
         }}
       />
-      {/* Violet glow — Figma "Ellipse 6" (578px), centred just off the top-right. */}
-      <div
+      {/* Violet glow — the design's exact "Ellipse 6" (#805DF7 circle r=289,
+          Gaussian blur σ=200, 31% opacity). The SVG carries the blur; we only
+          anchor its centre 37px from the right edge and 31px below the top. */}
+      <img
         aria-hidden
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(680px 680px at calc(100% - 30px) 24px, rgba(124,77,243,0.38) 0%, rgba(124,77,243,0.14) 40%, rgba(124,77,243,0) 70%)",
-        }}
+        src={authGlow}
+        alt=""
+        className="pointer-events-none absolute h-[1378px] w-[1378px] max-w-none"
+        style={{ top: -658, right: -652 }}
       />
 
       <div className="relative w-full max-w-[460px]">
