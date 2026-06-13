@@ -30,8 +30,8 @@ const Tag: React.FC<TagProps> = ({ color, name }) => {
 const FeatureCard: React.FC<FeatureProps> = ({ categoryIcon, tag, title, text, imageUrl, bgMask, colSpan }) => {
 
     return (
-        <div className={`${colSpan ? 'w-full lg:col-span-2' : 'w-full max-w-[380px]'} relative flex flex-col overflow-hidden rounded-[24px] border border-1 border-[#202023] bg-[#0A0A0A52] p-6 text-left shadow-[inset_0_-34px_64px_0_rgba(255,255,255,0.16)] sm:p-[32px]`}>
-            {bgMask && <img className="pointer-events-none absolute right-[-50px] top-0" src={bgMask} alt="" />}
+        <div className={`${colSpan ? 'lg:col-span-2' : ''} relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[#1E1E22] bg-[#0C0C0E]/60 p-6 text-left shadow-[inset_0_-40px_72px_-36px_rgba(196,188,251,0.16)] transition-colors duration-300 hover:border-[#2C2C33] sm:p-8`}>
+            {bgMask && <img className="pointer-events-none absolute right-[-50px] top-0 opacity-90" src={bgMask} alt="" />}
             <div className="mb-[24px] flex items-start justify-between">
                 {categoryIcon}
                 {tag}
@@ -46,9 +46,9 @@ const FeatureCard: React.FC<FeatureProps> = ({ categoryIcon, tag, title, text, i
 const featureListA: Array<FeatureProps> = [
     {
         categoryIcon: <div className="bg-[#F2EEFF] rounded-[12px] p-[8px]"><Sigma color="#652FF3" size={24} /></div>,
-        title: "LaTex Mathemattics",
+        title: "LaTeX Mathematics",
         tag: <Tag name="Mathematics" color="#652FF3" />,
-        text: "White and render LaTex math as easily as text from simple fractions to complex derrivations",
+        text: "Write and render LaTeX math as easily as text — from simple fractions to complex derivations.",
         imageUrl: latexFeatureSample,
     },
     {
@@ -71,7 +71,7 @@ const featureListB: Array<FeatureProps> = [
         categoryIcon: <div className="bg-[#E6FFF3] rounded-[12px] p-[8px]"><FlaskConical color="#12B164" /></div>,
         title: "Code Simulation",
         tag: <Tag name="Computation" color="#F3F08E" />,
-        text: "White and render LaTex math as easily as text from simple fractions to complex derivations",
+        text: "Run Python, MATLAB, or Julia simulations inline and see live output right on your slide.",
         imageUrl: codeSimFeature,
         colSpan: true,
     },
@@ -91,7 +91,7 @@ const FeaturesSection = () => {
             <p className="mb-12 text-[16px] font-[400] sm:mb-[79px] sm:text-[18px]">Professional-grade tools designed specifically for STEM education, research, and engineering documentation.</p>
 
 
-            <div className="mb-8 flex flex-col items-center gap-6 lg:flex-row lg:flex-wrap lg:items-stretch lg:justify-center lg:gap-[24px]">
+            <div className="mx-auto mb-6 grid w-full max-w-[1180px] grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
                 {featureListA.map((feature) => <FeatureCard key={feature.title} {...feature} />)}
             </div>
 
