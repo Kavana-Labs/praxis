@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Logo, { LogoText } from "@/components/Logo.tsx";
+import { useAuth } from "@/auth/use-auth";
 
 const NAV_LINKS = [
   { label: "Templates", href: "#templates" },
@@ -7,30 +9,65 @@ const NAV_LINKS = [
   { label: "FAQ", href: "#faqs" },
 ];
 
+function initialsOf(name: string | null, email: string): string {
+  if (name) {
+    return name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("");
+  }
+  return email[0]?.toUpperCase() ?? "?";
+}
+
 const Header = () => {
   const [open, setOpen] = useState(false);
+  const { user, isAuthenticated, status } = useAuth();
 
   return (
     <header className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-700">
       <nav className="border-gray-200 bg-white">
         <div className="mx-auto flex flex-wrap items-center justify-between px-4 py-4 sm:px-8 sm:py-5">
-          <a href="/" className="flex items-center">
+          <Link to="/" className="flex items-center">
             <Logo className="inline-block" /> <LogoText className="ml-1 inline-block" />
-          </a>
+          </Link>
 
           <div className="flex items-center lg:order-2">
-            <a
-              href="#"
-              className="mr-1 rounded-lg px-3 py-2.5 text-center text-sm font-medium text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-blue-300 sm:mr-2"
-            >
-              Login
-            </a>
-            <a
-              href="/editor"
-              className="rounded-lg bg-[linear-gradient(90deg,#5B16E1_0%,#805DF7_100%)] px-4 py-2.5 text-center text-sm text-white transition-transform duration-200 ease-out hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-primary active:scale-[0.98] sm:px-5"
-            >
-              Sign up
-            </a>
+            {status === "loading" ? (
+              <span className="h-10 w-[88px]" aria-hidden />
+            ) : isAuthenticated && user ? (
+              <>
+                <Link
+                  to="/app"
+                  className="mr-1 rounded-lg px-3 py-2.5 text-center text-sm font-medium text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-blue-300 sm:mr-2"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/app/profile"
+                  title={user.displayName ?? user.email}
+                  aria-label="Your profile"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-600 text-xs font-semibold text-white transition-colors hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                >
+                  {initialsOf(user.displayName, user.email)}
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/auth/login"
+                  className="mr-1 rounded-lg px-3 py-2.5 text-center text-sm font-medium text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-blue-300 sm:mr-2"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/auth/signup"
+                  className="rounded-lg bg-[linear-gradient(90deg,#5B16E1_0%,#805DF7_100%)] px-4 py-2.5 text-center text-sm text-white transition-transform duration-200 ease-out hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-primary active:scale-[0.98] sm:px-5"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}

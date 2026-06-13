@@ -5,7 +5,7 @@ const EndingSection = () => {
             <p className="mb-[40px] mt-[24px] sm:mt-[32px]">Join thousands of scientists, engineers, and educators who are already creating stunning scientific presentations.</p>
             <div className="mb-[18px] flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row sm:gap-4">
                 <a
-                    href="/editor"
+                    href="/app"
                     className="flex h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#5B16E1] to-[#805DF7] font-semibold text-white shadow-[0_73px_20px_0_rgba(92,23,226,0.00),_0_47px_19px_0_rgba(92,23,226,0.01),_0_26px_16px_0_rgba(92,23,226,0.05),_0_12px_12px_0_rgba(92,23,226,0.09),_0_3px_6px_0_rgba(92,23,226,0.10)] transition-transform duration-200 ease-out active:scale-[0.98] sm:h-[52px] sm:w-[190px]"
                 >
                     Create Presentation
