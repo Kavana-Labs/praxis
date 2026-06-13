@@ -1,16 +1,18 @@
 import { useId, useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { CircleAlert, CircleCheck, Eye, EyeOff, Loader2 } from "lucide-react";
-import authFormulaBg from "@/assets/auth/auth-formula-bg.png";
+import mathBackground from "@/assets/math_background.png";
 import authGlow from "@/assets/auth/auth-glow.svg";
 import praxisGlyph from "@/assets/auth/praxis-glyph.svg";
 import googleLogo from "@/assets/auth/google-logo.svg";
 import { cn } from "@/lib/utils";
 
 /**
- * Shared authentication UI, matching the Platform Figma auth screens: a
- * formula-texture backdrop with a violet glow, a centered 460px card with the
- * bare Praxis glyph, notched-label inputs, and the gradient CTA.
+ * Shared authentication UI: a centered 460px card (bare Praxis glyph,
+ * notched-label inputs, gradient CTA) on the same equation backdrop the
+ * landing page uses — the full-resolution formula texture scaled to fill,
+ * whose heavy downscale fades the strokes to a faint gray, behind the
+ * content, with the Figma "Ellipse 6" violet glow on top.
  */
 
 export function AuthLayout({
@@ -26,19 +28,16 @@ export function AuthLayout({
   below?: ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f3f4f6] px-4 py-10">
-      {/* Formula texture (the design's own asset). Multiply drops the source
-          white so only the equations darken the gray base — matching the
-          two stacked formula layers in the Figma frame. */}
-      <div
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-4 py-10">
+      {/* Equation backdrop — identical treatment to the landing page: the
+          full-resolution formula texture scaled to fill, full opacity (the
+          downscale is what fades the strokes to faint gray), behind content. */}
+      <img
         aria-hidden
-        className="absolute inset-0 opacity-[0.18] [mix-blend-mode:multiply]"
-        style={{
-          backgroundImage: `url(${authFormulaBg})`,
-          backgroundSize: "126%",
-          backgroundPosition: "center",
-          backgroundRepeat: "repeat",
-        }}
+        src={mathBackground}
+        alt=""
+        decoding="async"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
       {/* Violet glow — the design's exact "Ellipse 6" (#805DF7 circle r=289,
           Gaussian blur σ=200, 31% opacity). The SVG carries the blur; we only
