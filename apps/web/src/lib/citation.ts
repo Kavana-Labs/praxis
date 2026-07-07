@@ -19,12 +19,33 @@ export function formatCitationCompact(record: CitationRecord): string {
   return `${author}${year}${title}${source}`.replace(/^\.\s*/, "");
 }
 
+/**
+ * Coerce a user/imported-supplied URL into something safe to place in an
+ * `href`. Only http(s) and mailto are allowed. A value carrying any other
+ * explicit scheme (`javascript:`, `data:`, `vbscript:`, …) is rejected — this
+ * is the guard that stops a crafted citation from injecting script when the
+ * link is clicked. A schemeless value is treated as an https host so bare
+ * domains still link somewhere sensible instead of resolving as a relative
+ * path.
+ */
+export function safeExternalUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed;
+  // Any other explicit scheme is untrusted — reject outright.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null;
+  // No scheme: assume https rather than a relative link.
+  return `https://${trimmed}`;
+}
+
 /** The hyperlink target for a citation, if any (DOI preferred). */
 export function citationLink(record: CitationRecord): string | null {
-  if (record.doi) {
-    return record.doi.startsWith("http")
-      ? record.doi
-      : `https://doi.org/${record.doi}`;
+  if (record.doi && record.doi.trim()) {
+    const doi = record.doi.trim();
+    return /^https?:\/\//i.test(doi)
+      ? safeExternalUrl(doi)
+      : `https://doi.org/${doi}`;
   }
-  return record.url ?? null;
+  return safeExternalUrl(record.url);
 }

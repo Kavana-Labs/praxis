@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { INLINE_EDITABLE_TYPES } from "@/domain/constants";
 import {
   HANDLE_CURSORS,
   RESIZE_HANDLES,
@@ -42,12 +43,7 @@ import {
  */
 
 /** Object types that support inline editing on double-click. */
-const INLINE_EDITABLE = new Set<PraxisObject["type"]>([
-  "text",
-  "heading",
-  "code",
-  "math",
-]);
+const INLINE_EDITABLE = new Set<PraxisObject["type"]>(INLINE_EDITABLE_TYPES);
 
 function renderEditor(object: PraxisObject) {
   switch (object.type) {

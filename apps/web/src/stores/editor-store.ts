@@ -32,7 +32,14 @@ import type {
 
 const HISTORY_LIMIT = 100;
 
-export type SaveStatus = "saved" | "saving" | "dirty" | "error";
+export type SaveStatus =
+  | "saved"
+  | "saving"
+  | "dirty"
+  | "error"
+  // Another browser tab saved this same document while we had unsaved edits.
+  // Surfaced so the user can decide, instead of silently clobbering one side.
+  | "conflict";
 
 type DocRecipe = (doc: PraxisDocument) => void;
 

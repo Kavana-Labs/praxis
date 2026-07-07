@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { STORAGE_PREFIX } from "@/domain/constants";
+import { importDocument } from "@/domain/serialize";
 import { persistence } from "@/services/persistence";
 import { createHarmonicMotionDeck } from "@/seed/harmonic-motion";
 import { useEditorStore } from "@/stores/editor-store";
@@ -48,9 +50,9 @@ export function useEditorBootstrap(): void {
  * Safe to call at any time: a save already in flight is not duplicated, and
  * the status only flips to "saved" if nothing changed during the write.
  */
-export async function saveNow(): Promise<void> {
+export async function saveNow(opts?: { force?: boolean }): Promise<void> {
   const store = useEditorStore.getState();
-  if (store.saveStatus === "saving") return;
+  if (store.saveStatus === "saving" && !opts?.force) return;
   store.setSaveStatus("saving");
   try {
     await persistence.save(store.document);
@@ -91,4 +93,49 @@ export function useAutosave(): void {
       if (timer.current) clearTimeout(timer.current);
     };
   }, [document]);
+
+  // Flush pending edits when the page is being hidden/closed or the editor is
+  // unmounting (e.g. navigating to Present or the dashboard). Without this, an
+  // edit made within the debounce window before leaving is silently lost: the
+  // timer is cleared on unmount and the write never happens. localStorage
+  // writes are synchronous, so firing saveNow() here persists before teardown.
+  useEffect(() => {
+    const flush = () => {
+      if (useEditorStore.getState().saveStatus === "dirty") void saveNow();
+    };
+    const onVisibility = () => {
+      if (window.document.visibilityState === "hidden") flush();
+    };
+    window.document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
+
+  // Cross-tab coordination. localStorage fires a `storage` event in OTHER tabs
+  // (never the writer) when a key changes. If another tab saves the document we
+  // have open, adopt its version when we have no unsaved edits, or flag a
+  // conflict when we do — instead of letting the next autosave silently clobber
+  // the other tab's work (last-write-wins).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      const store = useEditorStore.getState();
+      if (e.key !== STORAGE_PREFIX + store.document.id || e.newValue == null) {
+        return;
+      }
+      if (store.saveStatus === "dirty" || store.saveStatus === "saving") {
+        store.setSaveStatus("conflict");
+        return;
+      }
+      const result = importDocument(e.newValue);
+      if (result.ok && result.document.id === store.document.id) {
+        store.loadDocument(result.document);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 }

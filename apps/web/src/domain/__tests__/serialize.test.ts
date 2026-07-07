@@ -132,4 +132,21 @@ describe("normalizeDocument", () => {
     if (result.type !== "image") throw new Error("expected image");
     expect(result.assetId).toBeNull();
   });
+
+  it("garbage-collects assets no object references", () => {
+    const doc = createDocument({}, fixedClock);
+    const img = createObject("image", {}, fixedClock);
+    if (img.type !== "image") throw new Error("expected image");
+    img.assetId = "asset_used";
+    doc.objects[img.id] = img;
+    doc.slides[0].objectIds = [img.id];
+    const at = "2020-01-01T00:00:00.000Z";
+    doc.assets = {
+      asset_used: { id: "asset_used", kind: "image", mimeType: "image/png", dataUrl: "data:,", createdAt: at },
+      asset_orphan: { id: "asset_orphan", kind: "image", mimeType: "image/png", dataUrl: "data:,", createdAt: at },
+    };
+    const normalized = normalizeDocument(doc);
+    expect(normalized.assets.asset_used).toBeDefined();
+    expect(normalized.assets.asset_orphan).toBeUndefined();
+  });
 });

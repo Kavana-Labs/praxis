@@ -47,9 +47,22 @@ def test_execute_returns_artifacts(fake_client):
     assert art["dataUrl"].startswith("data:image/png;base64,")
 
 
+def test_execute_sandbox_violation_category(fake_client):
+    resp = fake_client.post(
+        "/execute/python", json={"code": "urlopen('http://x')  # praxis:sandbox"}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "error"
+    assert body["errorCategory"] == "SANDBOX_VIOLATION"
+
+
 def test_empty_code_is_rejected(fake_client):
     resp = fake_client.post("/execute/python", json={"code": ""})
     assert resp.status_code == 422  # pydantic validation error
+    body = resp.json()
+    assert body["errorCategory"] == "VALIDATION_ERROR"
+    assert body["status"] == "error"
 
 
 def test_missing_code_is_rejected(fake_client):

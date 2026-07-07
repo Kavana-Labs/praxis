@@ -45,7 +45,10 @@ export type ImportResult =
  * path returns a structured result with a human-readable message rather than
  * throwing, so the UI can surface it without crashing.
  */
-export function importDocument(input: string | unknown): ImportResult {
+export function importDocument(
+  input: string | unknown,
+  opts?: { normalize?: boolean },
+): ImportResult {
   // 1. Parse JSON if needed.
   let raw: unknown;
   if (typeof input === "string") {
@@ -98,7 +101,12 @@ export function importDocument(input: string | unknown): ImportResult {
     };
   }
 
-  // 5. Normalize references, bounds, and ordering.
+  // 5. Normalize references, bounds, and ordering. Skippable for read-only
+  //    previews, where the whole-document rebuild pass is wasted work — the
+  //    data is already schema-valid and renderers tolerate dangling refs.
+  if (opts?.normalize === false) {
+    return { ok: true, document: parsed.data };
+  }
   return { ok: true, document: normalizeDocument(parsed.data) };
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { exportDocument, importDocument } from "@/domain/serialize";
 import { downloadTextFile, pickTextFile, slugify } from "@/lib/download";
@@ -14,6 +14,27 @@ import { Inspector } from "@/components/editor/inspector/Inspector";
 import { ImportPresentationModal } from "@/features/presentation-import/components/ImportPresentationModal";
 
 /**
+ * Tracks whether the viewport is below Tailwind's `lg` breakpoint (1024px),
+ * where the side panels behave as slide-over drawers rather than static
+ * columns. Drives the `inert`/focus behaviour that must only apply to the
+ * drawer form, never the persistent desktop layout.
+ */
+function useIsBelowLg(): boolean {
+  const [below, setBelow] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 1023.98px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023.98px)");
+    const onChange = () => setBelow(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return below;
+}
+
+/**
  * The Praxis editor shell. Desktop (lg+) shows a persistent three-pane layout
  * (slides · canvas · inspector). Below lg the slides and inspector collapse into
  * slide-over drawers toggled from the top bar, leaving the canvas full-width —
@@ -27,6 +48,47 @@ export function EditorPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [slidesOpen, setSlidesOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+
+  const isBelowLg = useIsBelowLg();
+  const slidesDrawerRef = useRef<HTMLDivElement>(null);
+  const inspectorDrawerRef = useRef<HTMLDivElement>(null);
+  // Element that had focus before a drawer opened, so we can restore it on close.
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+
+  // A closed drawer must not be reachable by keyboard or screen readers, but
+  // ONLY in drawer mode — at lg+ the panels are the persistent layout and must
+  // stay interactive. Move focus into a drawer when it opens; restore it to the
+  // trigger when it closes.
+  const openDrawer = slidesOpen ? "slides" : inspectorOpen ? "inspector" : null;
+  useEffect(() => {
+    if (!isBelowLg) return;
+    if (openDrawer) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
+      const el =
+        openDrawer === "slides"
+          ? slidesDrawerRef.current
+          : inspectorDrawerRef.current;
+      el?.focus();
+    } else {
+      restoreFocusRef.current?.focus?.();
+      restoreFocusRef.current = null;
+    }
+  }, [openDrawer, isBelowLg]);
+
+  // Escape closes an open drawer (before it would reach the canvas hotkeys).
+  useEffect(() => {
+    if (!openDrawer) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setSlidesOpen(false);
+        setInspectorOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [openDrawer]);
 
   const handleExport = useCallback(() => {
     const doc = useEditorStore.getState().document;
@@ -83,8 +145,14 @@ export function EditorPage() {
       <div className="relative flex flex-1 overflow-hidden">
         {/* Slides — static column at lg+, left drawer below */}
         <div
+          ref={slidesDrawerRef}
+          tabIndex={-1}
+          role={isBelowLg ? "dialog" : undefined}
+          aria-label={isBelowLg ? "Slides" : undefined}
+          aria-modal={isBelowLg && slidesOpen ? true : undefined}
+          inert={isBelowLg && !slidesOpen ? true : undefined}
           className={cn(
-            "absolute inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:shadow-none lg:translate-x-0",
+            "absolute inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200 outline-none lg:static lg:z-auto lg:shadow-none lg:translate-x-0",
             slidesOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           )}
         >
@@ -118,8 +186,14 @@ export function EditorPage() {
 
         {/* Inspector — static column at lg+, right drawer below */}
         <div
+          ref={inspectorDrawerRef}
+          tabIndex={-1}
+          role={isBelowLg ? "dialog" : undefined}
+          aria-label={isBelowLg ? "Inspector" : undefined}
+          aria-modal={isBelowLg && inspectorOpen ? true : undefined}
+          inert={isBelowLg && !inspectorOpen ? true : undefined}
           className={cn(
-            "absolute inset-y-0 right-0 z-40 shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:shadow-none lg:translate-x-0",
+            "absolute inset-y-0 right-0 z-40 shadow-xl transition-transform duration-200 outline-none lg:static lg:z-auto lg:shadow-none lg:translate-x-0",
             inspectorOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0",
           )}
         >

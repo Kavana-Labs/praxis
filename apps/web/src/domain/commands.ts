@@ -43,6 +43,25 @@ function reindexSlide(doc: PraxisDocument, slideId: string): void {
   });
 }
 
+/**
+ * Drop assets no image/artifact object references any more. Called after a
+ * delete so removing media reclaims its stored bytes immediately instead of
+ * accumulating dead base64 blobs toward the localStorage quota. Undo is
+ * unaffected: history holds a prior full snapshot that still carries the asset.
+ */
+function gcOrphanAssets(doc: PraxisDocument): void {
+  const referenced = new Set<string>();
+  for (const id of Object.keys(doc.objects)) {
+    const obj = doc.objects[id];
+    if ((obj.type === "image" || obj.type === "artifact") && obj.assetId) {
+      referenced.add(obj.assetId);
+    }
+  }
+  for (const assetId of Object.keys(doc.assets)) {
+    if (!referenced.has(assetId)) delete doc.assets[assetId];
+  }
+}
+
 function slideOf(doc: PraxisDocument, objectId: string): SlideContainer | undefined {
   return doc.slides.find((s) => s.objectIds.includes(objectId));
 }
@@ -86,6 +105,7 @@ export function cmdDeleteSlide(doc: PraxisDocument, slideId: string): void {
     delete doc.objects[objectId];
   }
   doc.slides = doc.slides.filter((s) => s.id !== slideId);
+  gcOrphanAssets(doc);
 }
 
 export function cmdDuplicateSlide(
@@ -302,6 +322,7 @@ export function cmdDeleteObjects(doc: PraxisDocument, objectIds: string[]): void
     delete doc.objects[objectId];
   }
   for (const slideId of affectedSlides) reindexSlide(doc, slideId);
+  gcOrphanAssets(doc);
 }
 
 export function cmdDuplicateObject(

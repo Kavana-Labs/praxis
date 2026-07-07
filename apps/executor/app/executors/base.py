@@ -22,12 +22,27 @@ def truncate(text: str, limit: int = None) -> str:
     return text[:limit] + f"\n…[truncated, {len(text) - limit} more chars]"
 
 
+# Stderr signatures that indicate the sandbox blocked the code rather than the
+# code being logically wrong: denied network (default --network none), a
+# read-only filesystem, dropped capabilities, or a seccomp kill.
+_SANDBOX_VIOLATION_MARKERS = (
+    "Network is unreachable",
+    "Temporary failure in name resolution",
+    "Operation not permitted",
+    "Read-only file system",
+    "PermissionError",
+    "seccomp",
+)
+
+
 def classify_error(stderr: str, exit_code: int, timed_out: bool) -> ErrorCategory:
     """Map a sandbox outcome to a standard error category."""
     if timed_out:
         return ErrorCategory.RESOURCE_LIMIT
     if "MemoryError" in stderr or exit_code == -9 or exit_code == 137:
         return ErrorCategory.RESOURCE_LIMIT
+    if any(marker in stderr for marker in _SANDBOX_VIOLATION_MARKERS):
+        return ErrorCategory.SANDBOX_VIOLATION
     if "ModuleNotFoundError" in stderr or "ImportError" in stderr:
         return ErrorCategory.DEPENDENCY_ERROR
     return ErrorCategory.USER_CODE_ERROR

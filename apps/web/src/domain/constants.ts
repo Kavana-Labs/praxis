@@ -19,6 +19,18 @@ export const MIN_OBJECT_WIDTH = 48;
 export const MIN_OBJECT_HEIGHT = 32;
 
 /**
+ * Object types that support inline content editing (double-click, or Enter on
+ * a selected object). Shared by the canvas and the keyboard shortcuts so both
+ * entry points agree on what "editable" means.
+ */
+export const INLINE_EDITABLE_TYPES = [
+  "text",
+  "heading",
+  "code",
+  "math",
+] as const;
+
+/**
  * Per-type minimum sizes (logical units). The registry consults this so each
  * object type stays usable at its smallest: code cells keep room for a line of
  * source, dividers can collapse to a thin rule, etc. Types not listed fall back
