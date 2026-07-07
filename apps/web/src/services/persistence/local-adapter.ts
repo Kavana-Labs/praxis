@@ -4,8 +4,9 @@ import {
   STORAGE_PREFIX,
   STORAGE_TRASH_KEY,
 } from "@/domain/constants";
-import { exportDocument, importDocument } from "@/domain/serialize";
+import { importDocument } from "@/domain/serialize";
 import type { PraxisDocument } from "@/domain/types";
+import { exportDocumentAsync } from "./exportAsync";
 import type {
   DocumentSummary,
   PersistenceAdapter,
@@ -61,7 +62,9 @@ export class LocalStorageAdapter implements PersistenceAdapter {
   }
 
   async save(doc: PraxisDocument): Promise<void> {
-    this.storage.setItem(STORAGE_PREFIX + doc.id, exportDocument(doc));
+    // Heavy decks serialize off the main thread; small ones stay synchronous.
+    const json = await exportDocumentAsync(doc);
+    this.storage.setItem(STORAGE_PREFIX + doc.id, json);
     const index = this.readIndex().filter((s) => s.id !== doc.id);
     index.push({ id: doc.id, title: doc.title, updatedAt: doc.updatedAt });
     this.writeIndex(index);

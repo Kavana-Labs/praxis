@@ -266,6 +266,47 @@ describe("special structures", () => {
     expect(shape.warnings.some((w) => /ellipse/i.test(w.message))).toBe(true);
   });
 
+  it("extracts a shape fill's alpha as opacity, through to the Praxis object", () => {
+    const bytes = makePptx({
+      slides: [
+        {
+          elements: [
+            {
+              kind: "shape",
+              preset: "rect",
+              x: 0,
+              y: 0,
+              cx: 914_400,
+              cy: 914_400,
+              fill: "3366FF",
+              fillAlpha: 50_000, // 50% opaque
+            },
+          ],
+        },
+      ],
+    });
+    const imported = parse(bytes);
+    const el = imported.slides[0].elements[0];
+    if (el.kind !== "shape") throw new Error("expected shape");
+    expect(el.opacity).toBeCloseTo(0.5, 5);
+
+    const { document } = convertToPraxisDocument(imported);
+    const shape = Object.values(document.objects).find((o) => o.type === "shape");
+    expect(shape?.opacity).toBeCloseTo(0.5, 5);
+  });
+
+  it("reads PNG intrinsic dimensions onto the imported asset", () => {
+    const bytes = makePptx({
+      slides: [
+        { elements: [{ kind: "image", x: 0, y: 0, cx: 914_400, cy: 914_400 }] },
+      ],
+    });
+    const imported = parse(bytes);
+    // TINY_PNG is a 1x1 image; its IHDR must be read straight from the bytes.
+    expect(imported.assets[0].width).toBe(1);
+    expect(imported.assets[0].height).toBe(1);
+  });
+
   it("marks SmartArt as unsupported with a placeholder element", () => {
     const bytes = makePptx({
       slides: [

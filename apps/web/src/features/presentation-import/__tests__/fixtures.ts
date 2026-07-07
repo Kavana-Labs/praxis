@@ -60,6 +60,8 @@ export type FixtureElement =
       cy: number;
       preset: string;
       fill?: string;
+      /** Fill alpha in thousandths of a percent (e.g. 50000 = 50% opaque). */
+      fillAlpha?: number;
       lineColor?: string;
       lineWidthEmu?: number;
     }
@@ -139,8 +141,10 @@ function elementXml(e: FixtureElement, ctx: SlideBuildContext): string {
       return `<p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/>${ph}</p:nvSpPr><p:spPr>${geom}<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>${fill}</p:spPr><p:txBody><a:bodyPr/>${e.paragraphs.map(paragraphXml).join("")}</p:txBody></p:sp>`;
     }
     case "shape": {
+      const alpha =
+        e.fillAlpha != null ? `<a:alpha val="${e.fillAlpha}"/>` : "";
       const fill = e.fill
-        ? `<a:solidFill><a:srgbClr val="${e.fill}"/></a:solidFill>`
+        ? `<a:solidFill><a:srgbClr val="${e.fill}">${alpha}</a:srgbClr></a:solidFill>`
         : "";
       const ln = e.lineColor
         ? `<a:ln w="${e.lineWidthEmu ?? 25_400}"><a:solidFill><a:srgbClr val="${e.lineColor}"/></a:solidFill></a:ln>`
