@@ -89,6 +89,42 @@ function bytesToDataUrl(bytes: Uint8Array, mimeType: string): string {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
+/**
+ * Read an image's intrinsic pixel dimensions straight from its header bytes —
+ * synchronous and allocation-free (no decode). PNG and GIF cover the common
+ * cases (matplotlib PNGs, pasted screenshots); other formats return null and
+ * simply carry no intrinsic size. Preserves source metadata (spec §8.4) without
+ * an async decode step in the parser.
+ */
+function readIntrinsicSize(
+  bytes: Uint8Array,
+  mime: string,
+): { width: number; height: number } | null {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // PNG: 8-byte signature, then IHDR with width@16, height@20 (big-endian).
+  if (
+    mime === "image/png" &&
+    bytes.length >= 24 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return { width: dv.getUint32(16), height: dv.getUint32(20) };
+  }
+  // GIF: width@6, height@8 (little-endian uint16).
+  if (
+    mime === "image/gif" &&
+    bytes.length >= 10 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46
+  ) {
+    return { width: dv.getUint16(6, true), height: dv.getUint16(8, true) };
+  }
+  return null;
+}
+
 function extensionOf(path: string): string {
   const dot = path.lastIndexOf(".");
   return dot >= 0 ? path.slice(dot + 1).toLowerCase() : "";
@@ -232,6 +268,7 @@ export function parsePptx(
     }
 
     const assetId = newId("asset");
+    const size = readIntrinsicSize(bytes, mime);
     assets.push({
       id: assetId,
       sourcePath: mediaPart,
@@ -239,6 +276,8 @@ export function parsePptx(
       filename: safeFilename(mediaPart),
       dataUrl: bytesToDataUrl(bytes, mime),
       byteLength: bytes.byteLength,
+      width: size?.width,
+      height: size?.height,
     });
     assetByPath.set(mediaPart, assetId);
     return { assetId };

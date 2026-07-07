@@ -178,8 +178,28 @@ export function resolveColorElement(
 }
 
 /**
+ * Extract the alpha (opacity) of a DrawingML color container, if present. The
+ * `a:alpha` modifier lives on the color element (e.g. `a:srgbClr`) and is
+ * expressed in thousandths of a percent (100000 = fully opaque). Returns a
+ * 0–1 opacity, or null when the fill is fully opaque / has no alpha.
+ */
+function extractAlpha(container: Element): number | null {
+  for (let i = 0; i < container.children.length; i++) {
+    const colorEl = container.children[i];
+    for (let j = 0; j < colorEl.children.length; j++) {
+      const mod = colorEl.children[j];
+      if (mod.localName === "alpha") {
+        const v = intAttr(mod, "val");
+        if (v != null) return Math.max(0, Math.min(1, v / 100_000));
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Resolve a fill from a properties element (`spPr`-like): returns
- *  - hex color for solid fills,
+ *  - hex color (+ optional alpha) for solid fills,
  *  - { gradient: hex } for gradient fills (approximated by the first stop),
  *  - "none" for explicit noFill,
  *  - null when no fill information is present.
@@ -187,13 +207,15 @@ export function resolveColorElement(
 export function resolveFill(
   props: Element | null,
   theme: ThemeColors,
-): { color: string; approximatedGradient?: boolean } | "none" | null {
+): { color: string; alpha?: number; approximatedGradient?: boolean } | "none" | null {
   if (!props) return null;
   if (child(props, "noFill")) return "none";
   const solid = child(props, "solidFill");
   if (solid) {
     const color = resolveColorElement(solid, theme);
-    return color ? { color } : null;
+    if (!color) return null;
+    const alpha = extractAlpha(solid);
+    return alpha != null && alpha < 1 ? { color, alpha } : { color };
   }
   const grad = child(props, "gradFill");
   if (grad) {

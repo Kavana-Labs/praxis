@@ -18,33 +18,21 @@ import {
   type User,
 } from "firebase/auth";
 import type { AuthResult, AuthService, AuthUser } from "../types";
+import type { FirebaseConfig } from "./firebaseConfig";
 
 /**
  * Firebase Authentication adapter. Verification and password-reset emails are
  * sent by Firebase with a continue-URL back into the app; the in-app
  * /auth/action route also handles direct action links (mode + oobCode).
+ *
+ * This module statically imports the Firebase SDK, so it must only ever be
+ * loaded via dynamic `import()` (see lazyFirebaseAuthService.ts) — never from
+ * the app entry graph — to keep Firebase out of the initial/landing bundle.
  */
 
-export type FirebaseConfig = {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  appId?: string;
-};
-
-export function firebaseConfigFromEnv(): FirebaseConfig | null {
-  const env = import.meta.env ?? {};
-  const apiKey = env.VITE_FIREBASE_API_KEY as string | undefined;
-  const authDomain = env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined;
-  const projectId = env.VITE_FIREBASE_PROJECT_ID as string | undefined;
-  if (!apiKey || !authDomain || !projectId) return null;
-  return {
-    apiKey,
-    authDomain,
-    projectId,
-    appId: env.VITE_FIREBASE_APP_ID as string | undefined,
-  };
-}
+// FirebaseConfig + firebaseConfigFromEnv now live in ./firebaseConfig (a
+// Firebase-free module) so the adapter can be selected without loading the SDK.
+export type { FirebaseConfig } from "./firebaseConfig";
 
 /** Calm copy for the Firebase error codes users can actually hit. */
 function messageFor(error: unknown): string {

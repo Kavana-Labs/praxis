@@ -1,6 +1,9 @@
 import { useEffect } from "react";
+import { INLINE_EDITABLE_TYPES } from "@/domain/constants";
 import { useEditorStore } from "@/stores/editor-store";
 import { saveNow } from "./usePersistence";
+
+const INLINE_EDITABLE = new Set<string>(INLINE_EDITABLE_TYPES);
 
 /**
  * Editor-wide keyboard shortcuts. Forwards user intent to the command layer;
@@ -12,6 +15,7 @@ import { saveNow } from "./usePersistence";
  *   Cmd/Ctrl+C / V      copy / paste selected objects
  *   Cmd/Ctrl+D          duplicate selected object
  *   Cmd/Ctrl+] / [      bring forward / send backward
+ *   Enter               edit the selected object (inline-editable types)
  *   Delete / Backspace  delete selected objects
  *   Arrows              nudge by 1 (Shift = 10) logical units
  *   Escape              editing → selected → deselected
@@ -89,6 +93,19 @@ export function useEditorHotkeys(enabled = true): void {
       if (typing || editing) return;
 
       const selected = store.selectedObjectIds;
+
+      // Enter opens the selected object for inline editing — the keyboard
+      // equivalent of double-click, so editing is reachable without a mouse.
+      if (e.key === "Enter") {
+        if (selected.length === 1) {
+          const obj = store.document.objects[selected[0]];
+          if (obj && !obj.locked && INLINE_EDITABLE.has(obj.type)) {
+            e.preventDefault();
+            store.setEditingObject(selected[0]);
+          }
+        }
+        return;
+      }
 
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selected.length > 0) {

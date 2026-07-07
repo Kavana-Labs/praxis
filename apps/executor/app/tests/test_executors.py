@@ -10,7 +10,23 @@ import subprocess
 import pytest
 
 from app.models import ErrorCategory, ExecutionStatus, ExecuteRequest
+from app.executors.base import classify_error
 from app.executors.fake_executor import FakeExecutor
+
+
+def test_classify_error_flags_sandbox_violation():
+    err = "OSError: [Errno 101] Network is unreachable"
+    assert classify_error(err, 1, False) is ErrorCategory.SANDBOX_VIOLATION
+    assert (
+        classify_error("PermissionError: [Errno 13]", 1, False)
+        is ErrorCategory.SANDBOX_VIOLATION
+    )
+
+
+def test_classify_error_defaults_to_user_code():
+    assert (
+        classify_error("ValueError: bad", 1, False) is ErrorCategory.USER_CODE_ERROR
+    )
 
 
 def run(executor, code: str, timeout: int = 10):

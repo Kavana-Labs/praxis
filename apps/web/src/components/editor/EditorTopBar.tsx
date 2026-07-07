@@ -160,20 +160,10 @@ export function EditorTopBar({
 
       <div className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />
 
-      <IconButton
-        onClick={undo}
-        disabled={!canUndo}
-        title={`Undo (${mod}Z)`}
-        className="hidden sm:flex"
-      >
+      <IconButton onClick={undo} disabled={!canUndo} title={`Undo (${mod}Z)`}>
         <Undo2 size={17} />
       </IconButton>
-      <IconButton
-        onClick={redo}
-        disabled={!canRedo}
-        title={`Redo (${mod}⇧Z)`}
-        className="hidden sm:flex"
-      >
+      <IconButton onClick={redo} disabled={!canRedo} title={`Redo (${mod}⇧Z)`}>
         <Redo2 size={17} />
       </IconButton>
 
@@ -189,7 +179,7 @@ export function EditorTopBar({
       {/* Right cluster */}
       <div className="ml-auto flex items-center gap-1">
         <ZoomIndicator />
-        <div className="hidden md:flex">
+        <div className="flex">
           <SaveStatusBadge />
         </div>
 

@@ -25,6 +25,12 @@ export type TrashedDocumentSummary = DocumentSummary & {
 export interface PersistenceAdapter {
   list(): Promise<DocumentSummary[]>;
   load(id: string): Promise<PraxisDocument | null>;
+  /**
+   * Load a document for read-only display (card thumbnails). Validated but not
+   * normalized — cheaper than `load` on large decks, and safe because the
+   * result is never edited or saved back.
+   */
+  loadForPreview(id: string): Promise<PraxisDocument | null>;
   save(doc: PraxisDocument): Promise<void>;
   remove(id: string): Promise<void>;
   /** Move a document to the trash (it disappears from `list`). */

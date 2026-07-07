@@ -181,6 +181,8 @@ function parseSp(
   const fillResult = resolveFill(spPr, ctx.theme);
   const fill =
     fillResult && fillResult !== "none" ? fillResult.color : undefined;
+  const fillOpacity =
+    fillResult && fillResult !== "none" ? fillResult.alpha : undefined;
   if (fillResult && fillResult !== "none" && fillResult.approximatedGradient) {
     warnings.push(
       warningFor(
@@ -286,6 +288,7 @@ function parseSp(
     preset,
     shape: "rectangle",
     fill,
+    opacity: fillOpacity,
     borderColor: ln.none ? undefined : ln.color,
     borderWidth: ln.none ? undefined : ln.width,
     radius: radius || undefined,

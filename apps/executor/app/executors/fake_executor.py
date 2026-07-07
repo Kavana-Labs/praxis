@@ -6,6 +6,7 @@ response shape without spawning processes or containers:
 
     # praxis:error      -> USER_CODE_ERROR
     # praxis:timeout    -> RESOURCE_LIMIT (timed out)
+    # praxis:sandbox    -> SANDBOX_VIOLATION (blocked network/fs/capability)
     # praxis:artifact   -> success with one PNG artifact
     (anything else)     -> success, echoing a canned stdout line
 """
@@ -43,6 +44,18 @@ class FakeExecutor(Executor):
                 exit_code=-1,
                 duration_ms=request.timeout_seconds * 1000,
                 error_category=ErrorCategory.RESOURCE_LIMIT,
+                artifacts=[],
+            )
+
+        if "# praxis:sandbox" in code:
+            return ExecuteResponse(
+                execution_id=execution_id,
+                status=ExecutionStatus.ERROR,
+                stdout="",
+                stderr="OSError: [Errno 101] Network is unreachable",
+                exit_code=1,
+                duration_ms=10,
+                error_category=ErrorCategory.SANDBOX_VIOLATION,
                 artifacts=[],
             )
 

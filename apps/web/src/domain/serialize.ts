@@ -1,33 +1,8 @@
 import { migrateToCurrent, MigrationError, type RawDocument } from "./migrations";
 import { normalizeDocument } from "./normalize";
 import { praxisDocumentSchema, versionedEnvelopeSchema } from "./schema";
+import { stableStringify } from "./stableStringify";
 import type { PraxisDocument } from "./types";
-
-/**
- * Deterministic JSON: object keys are emitted in sorted order recursively, so
- * the same logical document always serializes to byte-identical output. This
- * makes exports diff-friendly and stable across runs (important for tests and
- * future content-addressing). Arrays preserve order (it is semantic).
- */
-function stableStringify(value: unknown, indent = 2): string {
-  const seen = new WeakSet();
-  const normalize = (val: unknown): unknown => {
-    if (val === null || typeof val !== "object") return val;
-    if (seen.has(val as object)) {
-      throw new Error("Cannot serialize circular structure");
-    }
-    seen.add(val as object);
-    if (Array.isArray(val)) return val.map(normalize);
-    const obj = val as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(obj).sort()) {
-      if (obj[key] === undefined) continue; // omit undefined for stability
-      out[key] = normalize(obj[key]);
-    }
-    return out;
-  };
-  return JSON.stringify(normalize(value), null, indent);
-}
 
 /** Serialize a document to deterministic, pretty-printed JSON. */
 export function exportDocument(doc: PraxisDocument): string {
@@ -45,7 +20,10 @@ export type ImportResult =
  * path returns a structured result with a human-readable message rather than
  * throwing, so the UI can surface it without crashing.
  */
-export function importDocument(input: string | unknown): ImportResult {
+export function importDocument(
+  input: string | unknown,
+  opts?: { normalize?: boolean },
+): ImportResult {
   // 1. Parse JSON if needed.
   let raw: unknown;
   if (typeof input === "string") {
@@ -98,7 +76,12 @@ export function importDocument(input: string | unknown): ImportResult {
     };
   }
 
-  // 5. Normalize references, bounds, and ordering.
+  // 5. Normalize references, bounds, and ordering. Skippable for read-only
+  //    previews, where the whole-document rebuild pass is wasted work — the
+  //    data is already schema-valid and renderers tolerate dangling refs.
+  if (opts?.normalize === false) {
+    return { ok: true, document: parsed.data };
+  }
   return { ok: true, document: normalizeDocument(parsed.data) };
 }
 

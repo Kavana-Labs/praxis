@@ -18,6 +18,11 @@ import type { PraxisDocument, PraxisObject, SlideContainer } from "./types";
  *  - There is always at least one slide.
  *  - Image/citation/artifact references that dangle are softened (set null) so
  *    renderers can show a graceful fallback instead of crashing.
+ *  - Assets no longer referenced by any object are garbage-collected, so
+ *    deleting an image/artifact (or a whole slide) reclaims its stored bytes
+ *    instead of growing the document toward the localStorage quota forever.
+ *    (Undo is unaffected: history holds full prior snapshots that still carry
+ *    the asset.)
  */
 export function normalizeDocument(input: PraxisDocument): PraxisDocument {
   const objects: Record<string, PraxisObject> = { ...input.objects };
@@ -88,9 +93,29 @@ export function normalizeDocument(input: PraxisDocument): PraxisDocument {
   // 5. Guarantee at least one slide.
   const safeSlides = slides.length > 0 ? slides : input.slides;
 
+  // 6. Garbage-collect assets no surviving object references. Only image and
+  //    artifact objects hold an assetId; anything else in the asset table is
+  //    orphaned and safe to drop.
+  const referencedAssetIds = new Set<string>();
+  for (const id of Object.keys(objects)) {
+    const obj = objects[id];
+    if ((obj.type === "image" || obj.type === "artifact") && obj.assetId) {
+      referencedAssetIds.add(obj.assetId);
+    }
+  }
+  let assets = input.assets;
+  const assetIds = Object.keys(input.assets);
+  if (assetIds.some((id) => !referencedAssetIds.has(id))) {
+    assets = {};
+    for (const id of assetIds) {
+      if (referencedAssetIds.has(id)) assets[id] = input.assets[id];
+    }
+  }
+
   return {
     ...input,
     slides: safeSlides,
     objects,
+    assets,
   };
 }

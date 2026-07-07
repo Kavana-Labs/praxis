@@ -175,7 +175,7 @@ export function useDocumentPreview(summary: DocumentSummary) {
   useEffect(() => {
     if (previewCache.has(cacheKey)) return;
     let cancelled = false;
-    void persistence.load(summary.id).then((loaded) => {
+    void persistence.loadForPreview(summary.id).then((loaded) => {
       if (cancelled || !loaded) return;
       previewCache.set(cacheKey, loaded);
       setState({ key: cacheKey, doc: loaded });
